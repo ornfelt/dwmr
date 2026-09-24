@@ -85,6 +85,7 @@ keys = [
 	{ mod = "MODKEY",                   key = "space",    func = "setlayout" },
 	{ mod = "MODKEY|ShiftMask",         key = "space",    func = "togglefloating" },
 	{ mod = "MODKEY|ShiftMask",         key = "f",        func = "togglefullscr" },
+	{ mod = "MODKEY|ShiftMask",         key = "less",     func = "togglesticky" },
 	{ mod = "MODKEY",                   key = "0",        func = "view",            arg = { ui = "~0" } },
 	{ mod = "MODKEY|ShiftMask",         key = "0",        func = "tag",             arg = { ui = "~0" } },
 	{ mod = "MODKEY",                   key = "comma",    func = "focusmon",        arg = { i = -1 } },

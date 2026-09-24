@@ -104,11 +104,12 @@ const NET_WM_NAME: usize = 1;
 const NET_WM_STATE: usize = 2;
 const NET_WM_CHECK: usize = 3;
 const NET_WM_FULLSCREEN: usize = 4;
-const NET_ACTIVE_WINDOW: usize = 5;
-const NET_WM_WINDOW_TYPE: usize = 6;
-const NET_WM_WINDOW_TYPE_DIALOG: usize = 7;
-const NET_CLIENT_LIST: usize = 8;
-const NET_LAST: usize = 9; /* EWMH atoms */
+const NET_WM_STICKY: usize = 5;
+const NET_ACTIVE_WINDOW: usize = 6;
+const NET_WM_WINDOW_TYPE: usize = 7;
+const NET_WM_WINDOW_TYPE_DIALOG: usize = 8;
+const NET_CLIENT_LIST: usize = 9;
+const NET_LAST: usize = 10; /* EWMH atoms */
 const WM_PROTOCOLS: usize = 0;
 const WM_DELETE: usize = 1;
 const WM_STATE: usize = 2;
@@ -178,6 +179,7 @@ pub struct Client {
     pub neverfocus: bool,
     pub oldstate: bool,
     pub isfullscreen: bool,
+    pub issticky: bool,
     pub next: Option<ClientId>,
     pub snext: Option<ClientId>,
     pub mon: MonId,
@@ -341,7 +343,7 @@ impl Dwm {
     fn isvisible(&self, c: ClientId) -> bool {
         let c = &self.clients[c];
         let m = &self.mons[c.mon];
-        c.tags & m.tagset[m.seltags] != 0
+        c.tags & m.tagset[m.seltags] != 0 || c.issticky
     }
 
     /// `TAGMASK`
@@ -689,6 +691,14 @@ impl Dwm {
                 let fullscreen = action == 1 /* _NET_WM_STATE_ADD    */
                     || (action == 2 /* _NET_WM_STATE_TOGGLE */ && !self.clients[c].isfullscreen);
                 self.setfullscreen(c, fullscreen);
+            }
+
+            if cme.data.get_long(1) as Atom == self.netatom[NET_WM_STICKY]
+                || cme.data.get_long(2) as Atom == self.netatom[NET_WM_STICKY]
+            {
+                let action = cme.data.get_long(0);
+                let sticky = action == 1 || (action == 2 && !self.clients[c].issticky);
+                self.setsticky(c, sticky);
             }
         } else if cme.message_type == self.netatom[NET_ACTIVE_WINDOW]
             && Some(c) != self.mons[self.selmon].sel
@@ -1961,21 +1971,9 @@ impl Dwm {
 
     fn setfullscreen(&mut self, c: ClientId, fullscreen: bool) {
         if fullscreen && !self.clients[c].isfullscreen {
-            // SAFETY: the property data is one Atom.
-            unsafe {
-                XChangeProperty(
-                    self.dpy,
-                    self.clients[c].win,
-                    self.netatom[NET_WM_STATE],
-                    XA_ATOM,
-                    32,
-                    PropModeReplace,
-                    &self.netatom[NET_WM_FULLSCREEN] as *const Atom as *const c_uchar,
-                    1,
-                );
-            }
+            self.clients[c].isfullscreen = true;
+            self.updatenetwmstate(c);
             let cl = &mut self.clients[c];
-            cl.isfullscreen = true;
             cl.oldstate = cl.isfloating;
             cl.oldbw = cl.bw;
             cl.bw = 0;
@@ -1986,21 +1984,9 @@ impl Dwm {
             // SAFETY: plain Xlib call.
             unsafe { XRaiseWindow(self.dpy, self.clients[c].win) };
         } else if !fullscreen && self.clients[c].isfullscreen {
-            // SAFETY: an empty property (NULL, 0) is allowed by XChangeProperty.
-            unsafe {
-                XChangeProperty(
-                    self.dpy,
-                    self.clients[c].win,
-                    self.netatom[NET_WM_STATE],
-                    XA_ATOM,
-                    32,
-                    PropModeReplace,
-                    ptr::null(),
-                    0,
-                );
-            }
+            self.clients[c].isfullscreen = false;
+            self.updatenetwmstate(c);
             let cl = &mut self.clients[c];
-            cl.isfullscreen = false;
             cl.isfloating = cl.oldstate;
             cl.bw = cl.oldbw;
             cl.x = cl.oldx;
@@ -2009,6 +1995,18 @@ impl Dwm {
             cl.h = cl.oldh;
             let (x, y, w, h, m) = (cl.x, cl.y, cl.w, cl.h, cl.mon);
             self.resizeclient(c, x, y, w, h);
+            self.arrange(Some(m));
+        }
+    }
+
+    fn setsticky(&mut self, c: ClientId, sticky: bool) {
+        if sticky && !self.clients[c].issticky {
+            self.clients[c].issticky = true;
+            self.updatenetwmstate(c);
+        } else if !sticky && self.clients[c].issticky {
+            self.clients[c].issticky = false;
+            self.updatenetwmstate(c);
+            let m = self.clients[c].mon;
             self.arrange(Some(m));
         }
     }
@@ -2092,6 +2090,7 @@ impl Dwm {
         self.netatom[NET_WM_STATE] = atom(c"_NET_WM_STATE");
         self.netatom[NET_WM_CHECK] = atom(c"_NET_SUPPORTING_WM_CHECK");
         self.netatom[NET_WM_FULLSCREEN] = atom(c"_NET_WM_STATE_FULLSCREEN");
+        self.netatom[NET_WM_STICKY] = atom(c"_NET_WM_STATE_STICKY");
         self.netatom[NET_WM_WINDOW_TYPE] = atom(c"_NET_WM_WINDOW_TYPE");
         self.netatom[NET_WM_WINDOW_TYPE_DIALOG] = atom(c"_NET_WM_WINDOW_TYPE_DIALOG");
         self.netatom[NET_CLIENT_LIST] = atom(c"_NET_CLIENT_LIST");
@@ -2431,6 +2430,16 @@ impl Dwm {
         }
     }
 
+    pub fn togglesticky(&mut self, _arg: &Arg) {
+        let selmon = self.selmon;
+        let Some(sel) = self.mons[selmon].sel else {
+            return;
+        };
+        let sticky = !self.clients[sel].issticky;
+        self.setsticky(sel, sticky);
+        self.arrange(Some(selmon));
+    }
+
     pub fn toggletag(&mut self, arg: &Arg) {
         let selmon = self.selmon;
         let Some(sel) = self.mons[selmon].sel else {
@@ -2700,6 +2709,36 @@ impl Dwm {
         true
     }
 
+    /// Write `_NET_WM_STATE` as the list of the states dwm manages, so that
+    /// setting one state does not clear the other.
+    fn updatenetwmstate(&mut self, c: ClientId) {
+        let mut state = [0 as Atom; 2];
+        let mut n = 0;
+
+        if self.clients[c].isfullscreen {
+            state[n] = self.netatom[NET_WM_FULLSCREEN];
+            n += 1;
+        }
+        if self.clients[c].issticky {
+            state[n] = self.netatom[NET_WM_STICKY];
+            n += 1;
+        }
+        // SAFETY: state holds n initialised Atoms (n <= 2); an empty property
+        // (n == 0) is allowed by XChangeProperty.
+        unsafe {
+            XChangeProperty(
+                self.dpy,
+                self.clients[c].win,
+                self.netatom[NET_WM_STATE],
+                XA_ATOM,
+                32,
+                PropModeReplace,
+                state.as_ptr() as *const c_uchar,
+                n as c_int,
+            );
+        }
+    }
+
     fn updatenumlockmask(&mut self) {
         self.numlockmask = 0;
         // SAFETY: modmap is checked for NULL, read within its bounds and freed once.
@@ -2802,6 +2841,9 @@ impl Dwm {
 
         if state == self.netatom[NET_WM_FULLSCREEN] {
             self.setfullscreen(c, true);
+        }
+        if state == self.netatom[NET_WM_STICKY] {
+            self.setsticky(c, true);
         }
         if wtype == self.netatom[NET_WM_WINDOW_TYPE_DIALOG] {
             self.clients[c].isfloating = true;

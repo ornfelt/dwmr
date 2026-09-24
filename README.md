@@ -49,8 +49,9 @@ A few notes on the format:
   `Mod1Mask`..`Mod5Mask`, joined with `|`.
 - `{ tagkeys = "1", tag = 0 }` in `keys` expands like dwm's `TAGKEYS` macro.
 - Functions: spawn, togglebar, focusstack, pushstack, incnmaster, setmfact,
-  zoom, view, killclient, setlayout, togglefloating, togglefullscr, tag,
-  focusmon, tagmon, toggleview, toggletag, quit, movemouse, resizemouse.
+  zoom, view, killclient, setlayout, togglefloating, togglefullscr,
+  togglesticky, tag, focusmon, tagmon, toggleview, toggletag, quit, movemouse,
+  resizemouse.
   Layouts: tile, monocle, none.
 - `focusstack` and `pushstack` take a stack position (dwm's stacker patch):
   `{ i = "INC(+1)" }` is relative to the focused window, `{ i = 0 }` is the
@@ -70,6 +71,9 @@ A few notes on the format:
 - Focus follows mouse clicks only, not pointer movement (dwm's focusonclick
   patch). `focusonwheel = false` (the default) lets the scroll wheel work on
   an unfocused window without focusing it.
+- A sticky window is visible on every tag of its monitor (dwm's sticky
+  patch). `_NET_WM_STATE_STICKY` is supported, so a client can set the state
+  itself, and `_NET_WM_STATE` lists both the fullscreen and the sticky state.
 - A window toggled back to floating returns to the position and size it last
   floated with (dwm's savefloats patch). A window that never floated, or whose
   saved position is on another monitor, is centred on its monitor instead
