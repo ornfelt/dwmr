@@ -21,6 +21,10 @@ use crate::util::die;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
+    /* Rust ignores SIGPIPE, and every program dwmr spawns would inherit that;
+     * restore the default like a C program has it */
+    // SAFETY: setting a signal's disposition to SIG_DFL has no preconditions.
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let args: Vec<String> = std::env::args().collect();
     if args.len() == 2 && args[1] == "-v" {
         die(&format!("dwmr-{}", VERSION));
