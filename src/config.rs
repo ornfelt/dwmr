@@ -108,6 +108,14 @@ pub struct Layout {
     pub arrange: Option<ArrangeFn>,
 }
 
+/// A scratchpad (dwm's scratchpads patch): a named command whose window is
+/// tagged with its own tag bit, `SPTAG(i)`, above the normal tags.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Scratchpad {
+    pub name: String,
+    pub cmd: Rc<Command>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rule {
     pub class: Option<String>,
@@ -131,6 +139,7 @@ pub struct Config {
 
     /* tagging */
     pub tags: Vec<String>,
+    pub scratchpads: Vec<Scratchpad>,
     pub rules: Vec<Rule>,
 
     /* layout(s) */
@@ -176,6 +185,18 @@ impl Default for Config {
         /* tagging */
         let tags: Vec<String> = ["1", "2", "3", "4", "5", "6", "7", "8", "9"].iter().map(|s| s.to_string()).collect();
 
+        let sp = |name: &str, argv: &[&str]| Scratchpad {
+            name: name.to_string(),
+            cmd: Rc::new(Command { name: name.to_string(), argv: argv.iter().map(|s| s.to_string()).collect() }),
+        };
+        let scratchpads = vec![
+            /* name        cmd */
+            sp("spterm", &["st", "-n", "spterm", "-e", "python3"]),
+            sp("spcalc", &["st", "-n", "spcalc"]),
+        ];
+        /* SPTAG(i) */
+        let sptag = |i: u32| (1u32 << tags.len()) << i;
+
         let rules = vec![
             /* xprop(1):
              *	WM_CLASS(STRING) = instance, class
@@ -184,6 +205,8 @@ impl Default for Config {
             /* class      instance    title       tags mask     isfloating   monitor */
             Rule { class: Some("Gimp".into()), instance: None, title: None, tags: 0, isfloating: true, monitor: -1 },
             Rule { class: Some("Firefox".into()), instance: None, title: None, tags: 1 << 8, isfloating: false, monitor: -1 },
+            Rule { class: None, instance: Some("spterm".into()), title: None, tags: sptag(0), isfloating: true, monitor: -1 },
+            Rule { class: None, instance: Some("spcalc".into()), title: None, tags: sptag(1), isfloating: true, monitor: -1 },
         ];
 
         /* layout(s) */
@@ -241,6 +264,8 @@ impl Default for Config {
             k(modkey, XK_period, Dwm::focusmon, Arg::I(1)),
             k(modkey | xlib::ShiftMask, XK_comma, Dwm::tagmon, Arg::I(-1)),
             k(modkey | xlib::ShiftMask, XK_period, Dwm::tagmon, Arg::I(1)),
+            k(modkey, XK_apostrophe, Dwm::togglescratch, Arg::Ui(0)),
+            k(modkey | xlib::ShiftMask, XK_apostrophe, Dwm::togglescratch, Arg::Ui(1)),
         ];
         for (tag, key) in [XK_1, XK_2, XK_3, XK_4, XK_5, XK_6, XK_7, XK_8, XK_9].iter().enumerate() {
             tagkeys(&mut keys, modkey, *key as KeySym, tag as u32);
@@ -273,6 +298,7 @@ impl Default for Config {
             fonts: vec!["monospace:size=10".into()],
             colors,
             tags,
+            scratchpads,
             rules,
             mfact: 0.55,
             nmaster: 1,
@@ -355,6 +381,7 @@ struct RawConfig {
     colors: Option<RawColors>,
     /* tagging */
     tags: Option<Vec<String>>,
+    scratchpads: Option<Vec<RawScratchpad>>,
     rules: Option<Vec<RawRule>>,
     /* layout(s) */
     mfact: Option<f32>,
@@ -377,6 +404,13 @@ struct RawConfig {
 struct RawColors {
     norm: Option<[String; 3]>,
     sel: Option<[String; 3]>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawScratchpad {
+    name: String,
+    cmd: Vec<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -490,15 +524,41 @@ impl UintExpr {
             UintExpr::Str(s) => parse_uint_expr(s),
         }
     }
+
+    /// Like `to_u32`, also accepting `SPTAG(i)` for the given tag counts.
+    fn to_u32_tags(&self, tc: &TagCount) -> Result<u32, ConfigError> {
+        match self {
+            UintExpr::Int(i) => u32::try_from(*i).or_else(|_| err(format!("integer out of range: {}", i))),
+            UintExpr::Str(s) => parse_uint_expr_tags(s, tc),
+        }
+    }
+}
+
+/// The tag counts `SPTAG(i)` needs: `SPTAG(i) = (1 << ntags) << i`.
+struct TagCount {
+    ntags: usize,
+    nscratchpads: usize,
 }
 
 /// Parse `a | b`, `a << b`, `~a`, decimal and hex numbers and the `ButtonN`
 /// names into a u32, with C semantics (wrapping).
 pub fn parse_uint_expr(s: &str) -> Result<u32, ConfigError> {
-    fn atom(t: &str) -> Result<u32, ConfigError> {
+    parse_uint_expr_tags(s, &TagCount { ntags: 0, nscratchpads: 0 })
+}
+
+/// `parse_uint_expr` that also accepts `SPTAG(i)`, a scratchpad tag.
+fn parse_uint_expr_tags(s: &str, tc: &TagCount) -> Result<u32, ConfigError> {
+    let atom = |t: &str| -> Result<u32, ConfigError> {
         let t = t.trim();
         if let Some(rest) = t.strip_prefix('~') {
-            return Ok(!atom(rest)?);
+            return Ok(!parse_uint_expr_tags(rest, tc)?);
+        }
+        if let Some(i) = t.strip_prefix("SPTAG(").and_then(|r| r.strip_suffix(')')) {
+            let i: usize = i.trim().parse().or_else(|_| err(format!("invalid scratchpad index in '{}'", t)))?;
+            if i >= tc.nscratchpads {
+                return err(format!("'{}': there are {} scratchpads", t, tc.nscratchpads));
+            }
+            return Ok((1u32 << tc.ntags) << i);
         }
         if let Some(hex) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
             return u32::from_str_radix(hex, 16).or_else(|_| err(format!("invalid number '{}'", t)));
@@ -507,15 +567,15 @@ pub fn parse_uint_expr(s: &str) -> Result<u32, ConfigError> {
             return n.parse::<u32>().or_else(|_| err(format!("invalid button '{}'", t)));
         }
         t.parse::<u32>().or_else(|_| err(format!("invalid number '{}'", t)))
-    }
-    fn shift(t: &str) -> Result<u32, ConfigError> {
+    };
+    let shift = |t: &str| -> Result<u32, ConfigError> {
         let mut parts = t.split("<<");
         let mut v = atom(parts.next().unwrap_or(""))?;
         for p in parts {
             v = v.checked_shl(atom(p)?).unwrap_or(0);
         }
         Ok(v)
-    }
+    };
     let mut v = 0u32;
     for term in s.split('|') {
         v |= shift(term)?;
@@ -577,6 +637,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "togglebar" => Dwm::togglebar,
         "togglefloating" => Dwm::togglefloating,
         "togglefullscr" => Dwm::togglefullscr,
+        "togglescratch" => Dwm::togglescratch,
         "togglesticky" => Dwm::togglesticky,
         "toggletag" => Dwm::toggletag,
         "toggleview" => Dwm::toggleview,
@@ -606,7 +667,7 @@ fn parse_click(name: &str) -> Result<u32, ConfigError> {
     })
 }
 
-fn parse_arg(raw: Option<&RawArg>, commands: &[Rc<Command>], nlayouts: usize) -> Result<Arg, ConfigError> {
+fn parse_arg(raw: Option<&RawArg>, commands: &[Rc<Command>], nlayouts: usize, tc: &TagCount) -> Result<Arg, ConfigError> {
     let Some(raw) = raw else {
         return Ok(Arg::None);
     };
@@ -618,7 +679,7 @@ fn parse_arg(raw: Option<&RawArg>, commands: &[Rc<Command>], nlayouts: usize) ->
         return Ok(Arg::I(i.to_i32()?));
     }
     if let Some(ui) = &raw.ui {
-        return Ok(Arg::Ui(ui.to_u32()?));
+        return Ok(Arg::Ui(ui.to_u32_tags(tc)?));
     }
     if let Some(f) = raw.f {
         return Ok(Arg::F(f));
@@ -638,6 +699,16 @@ fn parse_arg(raw: Option<&RawArg>, commands: &[Rc<Command>], nlayouts: usize) ->
         return err(format!("unknown command or layout '{}' (define it under [commands] or use \"layouts[N]\")", v));
     }
     Ok(Arg::None)
+}
+
+/// `togglescratch` indexes the scratchpads with `arg.ui`; reject an index
+/// that has no scratchpad (togglescratch() also checks, but a config error
+/// is more helpful than a key that does nothing).
+fn check_scratch_index(func: KeyFn, arg: &Arg, nscratchpads: usize) -> Result<(), ConfigError> {
+    if std::ptr::fn_addr_eq(func, Dwm::togglescratch as KeyFn) && arg.ui() as usize >= nscratchpads {
+        return err(format!("togglescratch: scratchpad {} does not exist (there are {})", arg.ui(), nscratchpads));
+    }
+    Ok(())
 }
 
 /// Parse the text of a config.toml into a [`Config`], on top of the defaults.
@@ -684,6 +755,27 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
         }
         config.tags = tags;
     }
+    if let Some(scratchpads) = raw.scratchpads {
+        config.scratchpads = scratchpads
+            .into_iter()
+            .map(|sp| {
+                if sp.cmd.is_empty() {
+                    return err(format!("scratchpads: '{}' must have a command", sp.name));
+                }
+                let cmd = Rc::new(Command { name: sp.name.clone(), argv: sp.cmd });
+                Ok(Scratchpad { name: sp.name, cmd })
+            })
+            .collect::<Result<Vec<_>, ConfigError>>()?;
+    }
+    /* NUMTAGS: the tags and the scratchpad tags share one 32 bit tag mask */
+    if config.tags.len() + config.scratchpads.len() > 31 {
+        return err(format!(
+            "tags and scratchpads together must not exceed 31, got {} tags and {} scratchpads",
+            config.tags.len(),
+            config.scratchpads.len()
+        ));
+    }
+    let tc = TagCount { ntags: config.tags.len(), nscratchpads: config.scratchpads.len() };
     if let Some(rules) = raw.rules {
         config.rules = rules
             .iter()
@@ -692,7 +784,7 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
                     class: r.class.clone(),
                     instance: r.instance.clone(),
                     title: r.title.clone(),
-                    tags: r.tags.as_ref().map_or(Ok(0), UintExpr::to_u32)?,
+                    tags: r.tags.as_ref().map_or(Ok(0), |t| t.to_u32_tags(&tc))?,
                     isfloating: r.isfloating.unwrap_or(false),
                     monitor: r.monitor.unwrap_or(-1),
                 })
@@ -756,12 +848,17 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
         for (n, entry) in keys.iter().enumerate() {
             let ctx = |e: ConfigError| ConfigError(format!("keys[{}]: {}", n, e));
             match entry {
-                RawKeyEntry::Key(k) => out.push(Key {
-                    mod_: parse_mask(k.mod_.as_deref().unwrap_or("0"), modkey).map_err(ctx)?,
-                    keysym: parse_keysym(&k.key).map_err(ctx)?,
-                    func: parse_func(&k.func).map_err(ctx)?,
-                    arg: parse_arg(k.arg.as_ref(), &config.commands, nlayouts).map_err(ctx)?,
-                }),
+                RawKeyEntry::Key(k) => {
+                    let func = parse_func(&k.func).map_err(ctx)?;
+                    let arg = parse_arg(k.arg.as_ref(), &config.commands, nlayouts, &tc).map_err(ctx)?;
+                    check_scratch_index(func, &arg, tc.nscratchpads).map_err(ctx)?;
+                    out.push(Key {
+                        mod_: parse_mask(k.mod_.as_deref().unwrap_or("0"), modkey).map_err(ctx)?,
+                        keysym: parse_keysym(&k.key).map_err(ctx)?,
+                        func,
+                        arg,
+                    })
+                }
                 RawKeyEntry::TagKeys(t) => {
                     if t.tag as usize >= config.tags.len() {
                         return err(format!("keys[{}]: tagkeys: tag {} does not exist", n, t.tag));
@@ -789,12 +886,15 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
             .enumerate()
             .map(|(n, b)| {
                 let ctx = |e: ConfigError| ConfigError(format!("buttons[{}]: {}", n, e));
+                let func = parse_func(&b.func).map_err(ctx)?;
+                let arg = parse_arg(b.arg.as_ref(), &config.commands, nlayouts, &tc).map_err(ctx)?;
+                check_scratch_index(func, &arg, tc.nscratchpads).map_err(ctx)?;
                 Ok(Button {
                     click: parse_click(&b.click).map_err(ctx)?,
                     mask: parse_mask(b.mask.as_deref().unwrap_or("0"), modkey).map_err(ctx)?,
                     button: b.button.to_u32().map_err(ctx)?,
-                    func: parse_func(&b.func).map_err(ctx)?,
-                    arg: parse_arg(b.arg.as_ref(), &config.commands, nlayouts).map_err(ctx)?,
+                    func,
+                    arg,
                 })
             })
             .collect::<Result<Vec<_>, ConfigError>>()?;
@@ -870,6 +970,7 @@ mod tests {
         assert_eq!(c.fonts, d.fonts);
         assert_eq!(c.colors, d.colors);
         assert_eq!(c.tags, d.tags);
+        assert_eq!(c.scratchpads, d.scratchpads);
         assert_eq!(c.rules, d.rules);
         assert_eq!(c.mfact, d.mfact);
         assert_eq!(c.nmaster, d.nmaster);
@@ -894,6 +995,20 @@ mod tests {
         assert!(parse("nonsense = 1").is_err());
         assert!(parse("keys = [ { mod = \"MODKEY\", key = \"p\", func = \"spawn\", arg = { v = \"nope\" } } ]").is_err());
         assert!(parse("keys = [ { tagkeys = \"1\", tag = 40 } ]").is_err());
+        /* scratchpads */
+        assert!(parse("scratchpads = [ { name = \"x\", cmd = [] } ]").is_err());
+        assert!(parse("scratchpads = [ { name = \"x\", cmd = [\"x\"] } ]\nrules = [ { instance = \"x\", tags = \"SPTAG(1)\" } ]").is_err());
+        assert!(parse("keys = [ { mod = \"MODKEY\", key = \"y\", func = \"togglescratch\", arg = { ui = 2 } } ]").is_err());
+        let many = (0..30).map(|i| format!("\"{}\"", i)).collect::<Vec<_>>().join(", ");
+        assert!(parse(&format!("tags = [{}]", many)).is_err()); /* 30 tags + 2 scratchpads > 31 */
+    }
+
+    #[test]
+    fn scratchpad_tags() {
+        let c = parse("scratchpads = [ { name = \"a\", cmd = [\"a\"] }, { name = \"b\", cmd = [\"b\"] } ]\nrules = [ { instance = \"b\", tags = \"SPTAG(1)\", isfloating = true } ]").unwrap();
+        assert_eq!(c.scratchpads.len(), 2);
+        assert_eq!(c.rules[0].tags, 1 << 10);
+        assert!(parse_uint_expr("SPTAG(0)").is_err()); /* no scratchpad context */
     }
 
     #[test]

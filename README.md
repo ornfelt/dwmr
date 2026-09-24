@@ -50,9 +50,16 @@ A few notes on the format:
 - `{ tagkeys = "1", tag = 0 }` in `keys` expands like dwm's `TAGKEYS` macro.
 - Functions: spawn, togglebar, focusstack, pushstack, incnmaster, setmfact,
   zoom, view, killclient, setlayout, togglefloating, togglefullscr,
-  togglesticky, tag, focusmon, tagmon, toggleview, toggletag, quit, movemouse,
-  resizemouse.
+  togglesticky, togglescratch, tag, focusmon, tagmon, toggleview, toggletag,
+  quit, movemouse, resizemouse.
   Layouts: tile, monocle, none.
+- `scratchpads` is a list of `{ name, cmd }` (dwm's scratchpads patch). Each
+  scratchpad owns a tag bit above the normal tags, written `"SPTAG(0)"`,
+  `"SPTAG(1)"`, ... in a rule's `tags`; the tags and the scratchpads together
+  are limited to 31. `togglescratch` with `{ ui = n }` shows or hides the
+  window on scratchpad `n`, spawning its `cmd` when there is none yet. A
+  floating scratchpad window is centred each time it is shown. The bar shows
+  only the normal tags.
 - `focusstack` and `pushstack` take a stack position (dwm's stacker patch):
   `{ i = "INC(+1)" }` is relative to the focused window, `{ i = 0 }` is the
   top of the stack, `{ i = -1 }` the bottom, another integer an absolute

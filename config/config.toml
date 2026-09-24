@@ -24,6 +24,15 @@ colors.sel  = ["#eeeeee", "#005577", "#005577"]
 # tagging
 tags = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
+# Scratchpads: each has its own tag bit above the normal tags, SPTAG(i), and
+# a command that togglescratch spawns when no window has that tag yet. The
+# tags and the scratchpads together must not exceed 31.
+scratchpads = [
+	#  name              cmd
+	{ name = "spterm",   cmd = ["st", "-n", "spterm", "-e", "python3"] },
+	{ name = "spcalc",   cmd = ["st", "-n", "spcalc"] },
+]
+
 # xprop(1):
 #	WM_CLASS(STRING) = instance, class
 #	WM_NAME(STRING) = title
@@ -32,6 +41,8 @@ rules = [
 	#  class              instance   title   tags mask        isfloating           monitor
 	{ class = "Gimp",                                tags = 0,        isfloating = true,   monitor = -1 },
 	{ class = "Firefox",                             tags = "1 << 8", isfloating = false,  monitor = -1 },
+	{ instance = "spterm",                           tags = "SPTAG(0)", isfloating = true, monitor = -1 },
+	{ instance = "spcalc",                           tags = "SPTAG(1)", isfloating = true, monitor = -1 },
 ]
 
 # layout(s)
@@ -92,6 +103,8 @@ keys = [
 	{ mod = "MODKEY",                   key = "period",   func = "focusmon",        arg = { i = 1 } },
 	{ mod = "MODKEY|ShiftMask",         key = "comma",    func = "tagmon",          arg = { i = -1 } },
 	{ mod = "MODKEY|ShiftMask",         key = "period",   func = "tagmon",          arg = { i = 1 } },
+	{ mod = "MODKEY",                   key = "apostrophe", func = "togglescratch", arg = { ui = 0 } },
+	{ mod = "MODKEY|ShiftMask",         key = "apostrophe", func = "togglescratch", arg = { ui = 1 } },
 	# TAGKEYS(KEY, TAG): MODKEY+key views the tag, +Control toggles the view,
 	# +Shift tags the window and +Control+Shift toggles the window's tag.
 	{ tagkeys = "1",                    tag = 0 },

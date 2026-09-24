@@ -348,8 +348,31 @@ impl Dwm {
 
     /// `TAGMASK`
     #[inline]
+    /// `NUMTAGS` (scratchpads): the normal tags plus one tag per scratchpad
+    fn numtags(&self) -> usize {
+        self.config.tags.len() + self.config.scratchpads.len()
+    }
+
+    /// `TAGMASK`; the config loader guarantees NUMTAGS <= 31
     fn tagmask(&self) -> u32 {
+        (1u32 << self.numtags()) - 1
+    }
+
+    /// The mask of the normal tags only, without the scratchpad tags; used
+    /// by hide_vacant_tags for "a window on every tag" (dwm compares with
+    /// TAGMASK, which with scratchpads would never match).
+    fn tagbits(&self) -> u32 {
         (1u32 << self.config.tags.len()) - 1
+    }
+
+    /// `SPTAG(i)` (scratchpads); `i` must be a valid scratchpad index
+    fn sptag(&self, i: usize) -> u32 {
+        (1u32 << self.config.tags.len()) << i
+    }
+
+    /// `SPTAGMASK` (scratchpads)
+    fn sptagmask(&self) -> u32 {
+        ((1u32 << self.config.scratchpads.len()) - 1) << self.config.tags.len()
     }
 
     /// `TEXTW(X)`; takes the fields explicitly so it can be used while other
@@ -403,6 +426,7 @@ impl Dwm {
             (class, instance)
         };
 
+        let sptagmask = self.sptagmask();
         for r in &config.rules {
             if r.title.as_ref().is_none_or(|t| self.clients[c].name.contains(t.as_str()))
                 && r.class.as_ref().is_none_or(|cl| class.contains(cl.as_str()))
@@ -410,6 +434,14 @@ impl Dwm {
             {
                 self.clients[c].isfloating = r.isfloating;
                 self.clients[c].tags |= r.tags;
+                if r.tags & sptagmask != 0 && r.isfloating {
+                    let m = &self.mons[self.clients[c].mon];
+                    let (wx, wy, ww, wh) = (m.wx, m.wy, m.ww, m.wh);
+                    let cl = &mut self.clients[c];
+                    cl.x = wx + (ww / 2 - width(cl) / 2);
+                    cl.y = wy + (wh / 2 - height(cl) / 2);
+                }
+
                 if let Some(m) = self.mons.iter().position(|m| m.num == r.monitor) {
                     self.clients[c].mon = m;
                 }
@@ -418,7 +450,7 @@ impl Dwm {
         let tagmask = self.tagmask();
         let mon = &self.mons[self.clients[c].mon];
         let tags = self.clients[c].tags & tagmask;
-        self.clients[c].tags = if tags != 0 { tags } else { mon.tagset[mon.seltags] };
+        self.clients[c].tags = if tags != 0 { tags } else { mon.tagset[mon.seltags] & !sptagmask };
     }
 
     fn applysizehints(&mut self, c: ClientId, x: &mut i32, y: &mut i32, w: &mut i32, h: &mut i32, interact: bool) -> bool {
@@ -570,10 +602,10 @@ impl Dwm {
             let mut i = 0;
             let mut x = 0;
             let mut occ = 0u32;
-            let tagmask = self.tagmask();
+            let tagbits = self.tagbits();
             let mut c = self.mons[self.selmon].clients;
             while let Some(j) = c {
-                occ |= if self.clients[j].tags == tagmask { 0 } else { self.clients[j].tags };
+                occ |= if self.clients[j].tags == tagbits { 0 } else { self.clients[j].tags };
                 c = self.clients[j].next;
             }
             loop {
@@ -911,7 +943,7 @@ impl Dwm {
         let config = Rc::clone(&self.config);
         let mut tw = 0;
         let (mut occ, mut urg) = (0u32, 0u32);
-        let tagmask = self.tagmask();
+        let tagbits = self.tagbits();
         let (bh, lrpad) = (self.bh, self.lrpad);
 
         if !self.mons[m].showbar {
@@ -928,7 +960,7 @@ impl Dwm {
 
         let mut c = self.mons[m].clients;
         while let Some(i) = c {
-            occ |= if self.clients[i].tags == tagmask { 0 } else { self.clients[i].tags };
+            occ |= if self.clients[i].tags == tagbits { 0 } else { self.clients[i].tags };
             if self.clients[i].isurgent {
                 urg |= self.clients[i].tags;
             }
@@ -1888,7 +1920,9 @@ impl Dwm {
         self.detach(c);
         self.detachstack(c);
         self.clients[c].mon = m;
-        self.clients[c].tags = self.mons[m].tagset[self.mons[m].seltags]; /* assign tags of target monitor */
+        /* assign tags of target monitor, without any visible scratchpad tags */
+        let tags = self.mons[m].tagset[self.mons[m].seltags] & !self.sptagmask();
+        self.clients[c].tags = if tags != 0 { tags } else { 1 };
         self.attach(c);
         self.attachstack(c);
         if self.clients[c].isfullscreen {
@@ -2189,6 +2223,13 @@ impl Dwm {
             return;
         };
         if self.isvisible(c) {
+            if self.clients[c].tags & self.sptagmask() != 0 && self.clients[c].isfloating {
+                let m = &self.mons[self.clients[c].mon];
+                let (wx, wy, ww, wh) = (m.wx, m.wy, m.ww, m.wh);
+                let cl = &mut self.clients[c];
+                cl.x = wx + (ww / 2 - width(cl) / 2);
+                cl.y = wy + (wh / 2 - height(cl) / 2);
+            }
             /* show clients top down */
             let cl = &self.clients[c];
             // SAFETY: plain Xlib call on a managed window.
@@ -2427,6 +2468,42 @@ impl Dwm {
         if let Some(sel) = self.mons[selmon].sel {
             let fullscreen = !self.clients[sel].isfullscreen;
             self.setfullscreen(sel, fullscreen);
+        }
+    }
+
+    pub fn togglescratch(&mut self, arg: &Arg) {
+        let selmon = self.selmon;
+        let i = arg.ui() as usize;
+        let Some(sp) = self.config.scratchpads.get(i) else {
+            return;
+        };
+        let scratchtag = self.sptag(i);
+        let sparg = Arg::V(Rc::clone(&sp.cmd));
+
+        let mut found = None;
+        let mut c = self.mons[selmon].clients;
+        while let Some(k) = c {
+            if self.clients[k].tags & scratchtag != 0 {
+                found = Some(k);
+                break;
+            }
+            c = self.clients[k].next;
+        }
+        let seltags = self.mons[selmon].seltags;
+        if let Some(c) = found {
+            let newtagset = self.mons[selmon].tagset[seltags] ^ scratchtag;
+            if newtagset != 0 {
+                self.mons[selmon].tagset[seltags] = newtagset;
+                self.focus(None);
+                self.arrange(Some(selmon));
+            }
+            if self.isvisible(c) {
+                self.focus(Some(c));
+                self.restack(selmon);
+            }
+        } else {
+            self.mons[selmon].tagset[seltags] |= scratchtag;
+            self.spawn(&sparg);
         }
     }
 
