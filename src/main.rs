@@ -9,6 +9,7 @@ mod drw;
 mod dwm;
 mod fontconfig;
 mod util;
+mod xres;
 
 use std::ptr;
 

@@ -12,8 +12,8 @@ startup instead of being compiled in.
 ## Requirements
 
 - Rust (cargo) and a C toolchain for linking
-- Xlib, Xft, Xinerama and fontconfig headers (Debian: `libx11-dev libxft-dev
-  libxinerama-dev libfontconfig-dev`, plus `pkg-config`)
+- Xlib, Xft, Xinerama, XRes and fontconfig headers (Debian: `libx11-dev libxft-dev
+  libxinerama-dev libxres-dev libfontconfig-dev`, plus `pkg-config`)
 
 ## Installation
 
@@ -109,6 +109,12 @@ A few notes on the format:
   floated with (dwm's savefloats patch). A window that never floated, or whose
   saved position is on another monitor, is centred on its monitor instead
   (dwm's togglefloatingcenter patch).
+- A window started from a terminal takes the terminal's place, and the
+  terminal comes back when the window closes (dwm's swallow patch). A rule
+  marks a window as a terminal with `isterminal = true`; `noswallow = true`
+  keeps a window from swallowing its terminal. Floating windows only swallow
+  with `swallowfloating = true`. The terminal is found through the window's
+  PID (from the X-Resource extension) and its parents in `/proc`.
 
 ## Layout of the source
 
@@ -118,6 +124,7 @@ A few notes on the format:
 - `src/drw.rs` - drw.c, the bar drawing and font fallback code.
 - `src/config.rs` - config.def.h as `Config::default()` plus the TOML loader.
 - `src/util.rs` - util.c. `src/fontconfig.rs` - the fontconfig FFI drw needs.
+  `src/xres.rs` - the X-Resource (libXRes) FFI the swallow patch needs.
 - `examples/transient.rs` - transient.c, a test client
   (`cargo run --example transient`).
 

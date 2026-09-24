@@ -28,8 +28,11 @@
  */
 #![allow(non_upper_case_globals)] /* Xlib event/constant names are used as-is */
 
-use std::ffi::CString;
+use std::ffi::{CString, OsStr};
+use std::fs::File;
+use std::io::{Read, Write};
 use std::mem;
+use std::os::unix::ffi::OsStrExt;
 use std::os::raw::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong};
 use std::ptr;
 use std::rc::Rc;
@@ -46,6 +49,7 @@ use crate::config::{
 };
 use crate::drw::{Clr, Cur, Drw, COL_BORDER};
 use crate::util::{die, truncate_utf8};
+use crate::xres::{XResClientIdSpec, XResClientIdValue, XResClientIdsDestroy, XResGetClientPid, XResQueryClientIds, XResQueryExtension, XRES_CLIENT_ID_PID_MASK};
 use crate::VERSION;
 
 /* vanitygaps.c is #included by dwm's config.h; here it is a child module,
@@ -185,9 +189,14 @@ pub struct Client {
     pub oldstate: bool,
     pub isfullscreen: bool,
     pub issticky: bool,
+    pub isterminal: bool,
+    pub noswallow: bool,
     pub isbrowser: bool,
+    pub pid: libc::pid_t,
     pub next: Option<ClientId>,
     pub snext: Option<ClientId>,
+    /// The client this terminal swallowed; not in any client or stack list.
+    pub swallowing: Option<ClientId>,
     pub mon: MonId,
     pub win: Window,
 }
@@ -452,6 +461,8 @@ impl Dwm {
                 && r.class.as_ref().is_none_or(|cl| class.contains(cl.as_str()))
                 && r.instance.as_ref().is_none_or(|i| instance.contains(i.as_str()))
             {
+                self.clients[c].isterminal = r.isterminal;
+                self.clients[c].noswallow = r.noswallow;
                 self.clients[c].isfloating = r.isfloating;
                 self.clients[c].tags |= r.tags;
                 if r.tags & sptagmask != 0 && r.isfloating {
@@ -602,6 +613,66 @@ impl Dwm {
         let m = self.clients[c].mon;
         self.clients[c].snext = self.mons[m].stack;
         self.mons[m].stack = Some(c);
+    }
+
+    fn swallow(&mut self, p: ClientId, c: ClientId) {
+        if self.clients[c].noswallow || self.clients[c].isterminal {
+            return;
+        }
+        if !self.config.swallowfloating && self.clients[c].isfloating {
+            return;
+        }
+
+        self.detach(c);
+        self.detachstack(c);
+
+        self.setclientstate(c, WITHDRAWN_STATE);
+        // SAFETY: plain Xlib call.
+        unsafe { XUnmapWindow(self.dpy, self.clients[p].win) };
+
+        self.clients[p].swallowing = Some(c);
+        self.clients[c].mon = self.clients[p].mon;
+
+        let w = self.clients[p].win;
+        self.clients[p].win = self.clients[c].win;
+        self.clients[c].win = w;
+        let b = self.clients[p].isbrowser;
+        self.clients[p].isbrowser = self.clients[c].isbrowser;
+        self.clients[c].isbrowser = b;
+        self.updatetitle(p);
+        {
+            let cl = &self.clients[p];
+            // SAFETY: plain Xlib call.
+            unsafe { XMoveResizeWindow(self.dpy, cl.win, cl.x, cl.y, cl.w.max(1) as c_uint, cl.h.max(1) as c_uint) };
+        }
+        self.arrange(Some(self.clients[p].mon));
+        self.configure(p);
+        self.updateclientlist();
+    }
+
+    fn unswallow(&mut self, c: ClientId) {
+        let Some(s) = self.clients[c].swallowing else { return };
+        self.clients[c].win = self.clients[s].win;
+        self.clients[c].isbrowser = self.clients[s].isbrowser;
+
+        self.free_client(s);
+        self.clients[c].swallowing = None;
+
+        /* unfullscreen the client */
+        self.setfullscreen(c, false);
+        self.updatetitle(c);
+        self.arrange(Some(self.clients[c].mon));
+        {
+            let cl = &self.clients[c];
+            // SAFETY: plain Xlib calls.
+            unsafe {
+                XMapWindow(self.dpy, cl.win);
+                XMoveResizeWindow(self.dpy, cl.win, cl.x, cl.y, cl.w.max(1) as c_uint, cl.h.max(1) as c_uint);
+            }
+        }
+        self.setclientstate(c, NORMAL_STATE);
+        self.focus(None);
+        self.arrange(Some(self.clients[c].mon));
     }
 
     fn buttonpress(&mut self, e: &XEvent) {
@@ -898,6 +969,8 @@ impl Dwm {
 
         if let Some(c) = self.wintoclient(ev.window) {
             self.unmanage(c, true);
+        } else if let Some(s) = self.swallowingclient(ev.window).and_then(|c| self.clients[c].swallowing) {
+            self.unmanage(s, true);
         }
     }
 
@@ -1340,9 +1413,12 @@ impl Dwm {
 
     fn manage(&mut self, w: Window, wa: &XWindowAttributes) {
         let mut trans: Window = 0;
+        let mut term = None;
 
+        let pid = self.winpid(w);
         let c = self.alloc_client(Client {
             win: w,
+            pid,
             /* geometry */
             x: wa.x,
             oldx: wa.x,
@@ -1366,6 +1442,7 @@ impl Dwm {
         } else {
             self.clients[c].mon = self.selmon;
             self.applyrules(c);
+            term = self.termforwin(c);
         }
 
         {
@@ -1440,6 +1517,9 @@ impl Dwm {
         self.arrange(Some(m));
         // SAFETY: plain Xlib call.
         unsafe { XMapWindow(self.dpy, self.clients[c].win) };
+        if let Some(term) = term {
+            self.swallow(term, c);
+        }
         self.focus(None);
     }
 
@@ -2602,6 +2682,19 @@ impl Dwm {
     fn unmanage(&mut self, c: ClientId, destroyed: bool) {
         let m = self.clients[c].mon;
 
+        if self.clients[c].swallowing.is_some() {
+            self.unswallow(c);
+            return;
+        }
+
+        if let Some(s) = self.swallowingclient(self.clients[c].win) {
+            self.clients[s].swallowing = None;
+            self.free_client(c);
+            self.arrange(Some(m));
+            self.focus(None);
+            return;
+        }
+
         self.detach(c);
         self.detachstack(c);
         if !destroyed {
@@ -3005,6 +3098,117 @@ impl Dwm {
         }
         self.focus(None);
         self.arrange(Some(selmon));
+    }
+
+    fn winpid(&self, w: Window) -> libc::pid_t {
+        let mut result: libc::pid_t = 0;
+
+        let mut spec = XResClientIdSpec { client: w, mask: XRES_CLIENT_ID_PID_MASK };
+        let mut num_ids: c_long = 0;
+        let mut ids: *mut XResClientIdValue = ptr::null_mut();
+        // SAFETY: the extension check avoids Xlib's "extension missing"
+        // message; spec, num_ids and ids are valid in/out pointers, the error
+        // handler swap drops any error of the request (the xcb version frees
+        // it), and ids is read only within its num_ids entries, then freed.
+        unsafe {
+            let (mut evbase, mut errbase) = (0, 0);
+            if XResQueryExtension(self.dpy, &mut evbase, &mut errbase) == 0 {
+                return 0;
+            }
+            XSetErrorHandler(Some(xerrordummy));
+            let status = XResQueryClientIds(self.dpy, 1, &mut spec, &mut num_ids, &mut ids);
+            XSetErrorHandler(Some(xerror));
+            if status != Success as Status || ids.is_null() {
+                return 0;
+            }
+            for i in 0..num_ids.max(0) as usize {
+                let value = ids.add(i);
+                if (*value).spec.mask & XRES_CLIENT_ID_PID_MASK != 0 {
+                    result = XResGetClientPid(value);
+                    break;
+                }
+            }
+            XResClientIdsDestroy(num_ids, ids);
+        }
+
+        if result == -1 {
+            result = 0;
+        }
+        result
+    }
+
+    fn getparentprocess(p: libc::pid_t) -> libc::pid_t {
+        let mut buf = [0u8; 256];
+        let mut path = [0u8; 32];
+        let n = {
+            let mut cur = &mut path[..];
+            if write!(cur, "/proc/{}/stat", p as u32).is_err() {
+                return 0;
+            }
+            32 - cur.len()
+        };
+
+        let Ok(mut f) = File::open(OsStr::from_bytes(&path[..n])) else {
+            return 0;
+        };
+        let Ok(len) = f.read(&mut buf) else {
+            return 0;
+        };
+        /* "pid (comm) state ppid ...": comm may contain spaces and ')', and
+         * is at most 15 bytes, so the last ')' in the buffer ends it */
+        let buf = &buf[..len];
+        let Some(end) = buf.iter().rposition(|&b| b == b')') else {
+            return 0;
+        };
+        std::str::from_utf8(&buf[end + 1..])
+            .ok()
+            .and_then(|rest| rest.split_ascii_whitespace().nth(1))
+            .and_then(|v| v.parse::<libc::pid_t>().ok())
+            .unwrap_or(0)
+    }
+
+    fn isdescprocess(p: libc::pid_t, mut c: libc::pid_t) -> bool {
+        /* bounded, so a parent chain garbled by PID reuse cannot loop forever */
+        let mut depth = 0;
+        while p != c && c != 0 && depth < 4096 {
+            c = Self::getparentprocess(c);
+            depth += 1;
+        }
+
+        c != 0 && p == c
+    }
+
+    fn termforwin(&self, w: ClientId) -> Option<ClientId> {
+        if self.clients[w].pid == 0 || self.clients[w].isterminal {
+            return None;
+        }
+
+        for m in &self.mons {
+            let mut c = m.clients;
+            while let Some(i) = c {
+                let cl = &self.clients[i];
+                if cl.isterminal && cl.swallowing.is_none() && cl.pid != 0 && Self::isdescprocess(cl.pid, self.clients[w].pid) {
+                    return Some(i);
+                }
+                c = cl.next;
+            }
+        }
+
+        None
+    }
+
+    fn swallowingclient(&self, w: Window) -> Option<ClientId> {
+        for m in &self.mons {
+            let mut c = m.clients;
+            while let Some(i) = c {
+                if self.clients[i].swallowing.is_some_and(|s| self.clients[s].win == w) {
+                    return Some(i);
+                }
+                c = self.clients[i].next;
+            }
+        }
+
+        None
     }
 
     fn wintoclient(&self, w: Window) -> Option<ClientId> {

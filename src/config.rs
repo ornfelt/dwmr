@@ -124,6 +124,8 @@ pub struct Rule {
     pub title: Option<String>,
     pub tags: u32,
     pub isfloating: bool,
+    pub isterminal: bool,
+    pub noswallow: bool,
     pub monitor: i32,
 }
 
@@ -137,6 +139,7 @@ pub struct Config {
     pub smartgaps: bool, /* true means no outer gap when there is only one window */
     pub browsergaps: bool, /* false means no outer gap when there is only one window and it is firefox */
     pub snap: u32,     /* snap pixel */
+    pub swallowfloating: bool, /* true means swallow floating windows by default */
     pub showbar: bool, /* false means no bar */
     pub topbar: bool,  /* false means bottom bar */
     pub focusonwheel: bool, /* false allows the user to scroll window without changing focus */
@@ -209,11 +212,13 @@ impl Default for Config {
              *	WM_CLASS(STRING) = instance, class
              *	WM_NAME(STRING) = title
              */
-            /* class      instance    title       tags mask     isfloating   monitor */
-            Rule { class: Some("Gimp".into()), instance: None, title: None, tags: 0, isfloating: true, monitor: -1 },
-            Rule { class: Some("Firefox".into()), instance: None, title: None, tags: 1 << 8, isfloating: false, monitor: -1 },
-            Rule { class: None, instance: Some("spterm".into()), title: None, tags: sptag(0), isfloating: true, monitor: -1 },
-            Rule { class: None, instance: Some("spcalc".into()), title: None, tags: sptag(1), isfloating: true, monitor: -1 },
+            /* class      instance    title       tags mask     isfloating   isterminal   noswallow   monitor */
+            Rule { class: Some("Gimp".into()), instance: None, title: None, tags: 0, isfloating: true, isterminal: false, noswallow: false, monitor: -1 },
+            Rule { class: Some("Firefox".into()), instance: None, title: None, tags: 1 << 8, isfloating: false, isterminal: false, noswallow: false, monitor: -1 },
+            Rule { class: Some("wezterm".into()), instance: None, title: None, tags: 0, isfloating: false, isterminal: true, noswallow: false, monitor: -1 },
+            Rule { class: None, instance: None, title: Some("Event Tester".into()), tags: 0, isfloating: false, isterminal: false, noswallow: true, monitor: -1 }, /* xev */
+            Rule { class: None, instance: Some("spterm".into()), title: None, tags: sptag(0), isfloating: true, isterminal: true, noswallow: true, monitor: -1 },
+            Rule { class: None, instance: Some("spcalc".into()), title: None, tags: sptag(1), isfloating: true, isterminal: true, noswallow: false, monitor: -1 },
         ];
 
         /* layout(s) */
@@ -325,6 +330,7 @@ impl Default for Config {
             smartgaps: false,
             browsergaps: false,
             snap: 32,
+            swallowfloating: false,
             showbar: true,
             topbar: true,
             focusonwheel: false,
@@ -413,6 +419,7 @@ struct RawConfig {
     smartgaps: Option<bool>,
     browsergaps: Option<bool>,
     snap: Option<u32>,
+    swallowfloating: Option<bool>,
     showbar: Option<bool>,
     topbar: Option<bool>,
     focusonwheel: Option<bool>,
@@ -460,6 +467,8 @@ struct RawRule {
     title: Option<String>,
     tags: Option<UintExpr>,
     isfloating: Option<bool>,
+    isterminal: Option<bool>,
+    noswallow: Option<bool>,
     monitor: Option<i32>,
 }
 
@@ -794,6 +803,9 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
     if let Some(v) = raw.snap {
         config.snap = v;
     }
+    if let Some(v) = raw.swallowfloating {
+        config.swallowfloating = v;
+    }
     if let Some(v) = raw.showbar {
         config.showbar = v;
     }
@@ -857,6 +869,8 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
                     title: r.title.clone(),
                     tags: r.tags.as_ref().map_or(Ok(0), |t| t.to_u32_tags(&tc))?,
                     isfloating: r.isfloating.unwrap_or(false),
+                    isterminal: r.isterminal.unwrap_or(false),
+                    noswallow: r.noswallow.unwrap_or(false),
                     monitor: r.monitor.unwrap_or(-1),
                 })
             })
@@ -1037,6 +1051,7 @@ mod tests {
         assert_eq!((c.gappih, c.gappiv, c.gappoh, c.gappov), (d.gappih, d.gappiv, d.gappoh, d.gappov));
         assert_eq!((c.smartgaps, c.browsergaps), (d.smartgaps, d.browsergaps));
         assert_eq!(c.snap, d.snap);
+        assert_eq!(c.swallowfloating, d.swallowfloating);
         assert_eq!(c.showbar, d.showbar);
         assert_eq!(c.topbar, d.topbar);
         assert_eq!(c.focusonwheel, d.focusonwheel);

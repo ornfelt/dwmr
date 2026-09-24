@@ -47,6 +47,15 @@ default the scroll wheel (Button4 and Button5) does not change the focus or
 the selected screen either; set
 .B focusonwheel = true
 in the configuration file to make it do so.
+.P
+A window started from a terminal swallows it: it takes the terminal's place
+in the layout, and the terminal reappears when the window is closed (swallow).
+Rules mark terminals with
+.B isterminal = true
+and exempt windows with
+.BR "noswallow = true" ;
+floating windows only swallow with
+.BR "swallowfloating = true" .
 .SH OPTIONS
 .TP
 .B \-v

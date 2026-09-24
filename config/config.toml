@@ -19,6 +19,7 @@ gappov = 20           # vert outer gap between windows and screen edge
 smartgaps = false     # true means no outer gap when there is only one window
 browsergaps = false   # false means no outer gap when there is only one window and it is firefox
 snap = 32             # snap pixel
+swallowfloating = false # true means swallow floating windows by default
 showbar = true        # false means no bar
 topbar = true         # false means bottom bar
 focusonwheel = false  # false allows the user to scroll window without changing focus
@@ -44,11 +45,13 @@ scratchpads = [
 #	WM_NAME(STRING) = title
 # class, instance and title are substring matches; omit one to match anything.
 rules = [
-	#  class              instance   title   tags mask        isfloating           monitor
-	{ class = "Gimp",                                tags = 0,        isfloating = true,   monitor = -1 },
-	{ class = "Firefox",                             tags = "1 << 8", isfloating = false,  monitor = -1 },
-	{ instance = "spterm",                           tags = "SPTAG(0)", isfloating = true, monitor = -1 },
-	{ instance = "spcalc",                           tags = "SPTAG(1)", isfloating = true, monitor = -1 },
+	#  class / instance / title      tags mask            isfloating          isterminal          noswallow          monitor
+	{ class = "Gimp",                tags = 0,            isfloating = true,  isterminal = false, noswallow = false, monitor = -1 },
+	{ class = "Firefox",             tags = "1 << 8",     isfloating = false, isterminal = false, noswallow = false, monitor = -1 },
+	{ class = "wezterm",             tags = 0,            isfloating = false, isterminal = true,  noswallow = false, monitor = -1 },
+	{ title = "Event Tester",        tags = 0,            isfloating = false, isterminal = false, noswallow = true,  monitor = -1 }, # xev
+	{ instance = "spterm",           tags = "SPTAG(0)",   isfloating = true,  isterminal = true,  noswallow = true,  monitor = -1 },
+	{ instance = "spcalc",           tags = "SPTAG(1)",   isfloating = true,  isterminal = true,  noswallow = false, monitor = -1 },
 ]
 
 # layout(s)
