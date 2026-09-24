@@ -127,6 +127,11 @@ pub struct Client {
     pub y: i32,
     pub w: i32,
     pub h: i32,
+    /* stored float geometry, used on mode revert */
+    pub sfx: i32,
+    pub sfy: i32,
+    pub sfw: i32,
+    pub sfh: i32,
     pub oldx: i32,
     pub oldy: i32,
     pub oldw: i32,
@@ -1327,6 +1332,13 @@ impl Dwm {
         self.updatewindowtype(c);
         self.updatesizehints(c);
         self.updatewmhints(c);
+        {
+            let cl = &mut self.clients[c];
+            cl.sfx = cl.x;
+            cl.sfy = cl.y;
+            cl.sfw = cl.w;
+            cl.sfh = cl.h;
+        }
         // SAFETY: plain Xlib call.
         unsafe { XSelectInput(self.dpy, w, EnterWindowMask | FocusChangeMask | PropertyChangeMask | StructureNotifyMask) };
         self.grabbuttons(c, false);
@@ -2300,12 +2312,33 @@ impl Dwm {
             /* no support for fullscreen windows */
             return;
         }
-        let cl = &mut self.clients[sel];
+        let c = sel;
+        let cl = &mut self.clients[c];
         cl.isfloating = !cl.isfloating || cl.isfixed;
+
         if cl.isfloating {
-            let (x, y, w, h) = (cl.x, cl.y, cl.w, cl.h);
-            self.resize(sel, x, y, w, h, false);
+            /* center if never floated, or if the stored geometry is on
+             * another monitor (the client was moved since) */
+            let (sfx, sfy, sfw, sfh) = (cl.sfx, cl.sfy, cl.sfw, cl.sfh);
+            let (mon, bw) = (cl.mon, cl.bw);
+            if sfx == 0 || self.recttomon(sfx, sfy, sfw, sfh) != mon {
+                let m = &self.mons[mon];
+                let cl = &mut self.clients[c];
+                cl.sfx = m.mx + (m.mw - sfw - 2 * bw) / 2;
+                cl.sfy = m.my + (m.mh - sfh - 2 * bw) / 2;
+            }
+            /* restore last known float dimensions */
+            let cl = &self.clients[c];
+            let (sfx, sfy, sfw, sfh) = (cl.sfx, cl.sfy, cl.sfw, cl.sfh);
+            self.resize(c, sfx, sfy, sfw, sfh, false);
+        } else {
+            /* save last known float dimensions */
+            cl.sfx = cl.x;
+            cl.sfy = cl.y;
+            cl.sfw = cl.w;
+            cl.sfh = cl.h;
         }
+
         self.arrange(Some(selmon));
     }
 

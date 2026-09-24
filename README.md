@@ -66,6 +66,10 @@ A few notes on the format:
 - Focus follows mouse clicks only, not pointer movement (dwm's focusonclick
   patch). `focusonwheel = false` (the default) lets the scroll wheel work on
   an unfocused window without focusing it.
+- A window toggled back to floating returns to the position and size it last
+  floated with (dwm's savefloats patch). A window that never floated, or whose
+  saved position is on another monitor, is centred on its monitor instead
+  (dwm's togglefloatingcenter patch).
 
 ## Layout of the source
 
