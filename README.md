@@ -1,3 +1,5 @@
+<p align="center"><img src="dwmr.png" alt="dwmr"></p>
+
 # dwmr - dynamic window manager
 
 dwmr is a port of [dwm](https://dwm.suckless.org) (6.8) to Rust. It is a
