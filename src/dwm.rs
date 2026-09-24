@@ -283,6 +283,11 @@ pub struct Dwm {
     layouts: Vec<Layout>,
     stext: String,
     statusw: i32, /* width of the status text, set by drawbar() */
+    statussig: i32, /* signal byte of the clicked status block, 0 for none */
+    statuspid: libc::pid_t, /* the status bar's pid, from getstatusbarpid() */
+    /* drawstatusbar()'s copy of stext without the signal bytes, kept so it
+     * is not allocated on every redraw */
+    stextdraw: String,
     screen: c_int,
     sw: i32,
     sh: i32, /* X display screen geometry width, height */
@@ -361,6 +366,9 @@ impl Dwm {
             config: Rc::new(config),
             stext: String::new(),
             statusw: 0,
+            statussig: 0,
+            statuspid: -1,
+            stextdraw: String::new(),
             screen,
             sw,
             sh,
@@ -769,7 +777,42 @@ impl Dwm {
             } else if ev.x < x + Self::textw(&mut self.drw, self.lrpad, &self.mons[self.selmon].ltsymbol) {
                 click = CLK_LT_SYMBOL;
             } else if ev.x > self.mons[self.selmon].ww - self.statusw {
+                x = self.mons[self.selmon].ww - self.statusw;
                 click = CLK_STATUS_TEXT;
+
+                let stext = mem::take(&mut self.stext); /* put back below, no copy */
+                let text = stext.as_bytes();
+                let lrpad = self.lrpad;
+                let mut t = 0; /* start of the text piece being measured */
+                let mut s = 0;
+                self.statussig = 0;
+                while s < text.len() && x <= ev.x {
+                    if text[s] < b' ' {
+                        let ch = text[s];
+                        x += Self::textw(&mut self.drw, lrpad, &stext[t..s]) - lrpad;
+                        t = s + 1;
+                        if x >= ev.x {
+                            break;
+                        }
+                        self.statussig = ch as i32;
+                    } else if text[s] == b'^' {
+                        x += Self::textw(&mut self.drw, lrpad, &stext[t..s]) - lrpad;
+                        /* measure with the font the text was drawn with (^B^/^N^) */
+                        self.statusfontcode(&stext[s + 1..]);
+                        /* no ^f^ (forward) here: drawstatusbar() ignores it too */
+                        s += 1;
+                        while s < text.len() && text[s] != b'^' {
+                            s += 1;
+                        }
+                        if s >= text.len() {
+                            break; /* unterminated ^ code */
+                        }
+                        t = s + 1;
+                    }
+                    s += 1;
+                }
+                self.stext = stext;
+                self.setnormalfont();
             }
             /* notitle: the space between the layout symbol and the status is
              * no click target; click stays ClkRootWin */
@@ -1169,6 +1212,12 @@ impl Dwm {
     /// starts.
     fn drawstatusbar(&mut self, m: MonId, bh: i32, stext: &str) -> i32 {
         let lrpad = self.lrpad;
+
+        /* strip the signal bytes that mark clickable status blocks */
+        let mut buf = mem::take(&mut self.stextdraw);
+        buf.clear();
+        buf.extend(stext.chars().filter(|&c| c >= ' '));
+        let stext = buf.as_str();
         let text = stext.as_bytes();
         let mut iscode = false;
 
@@ -1261,6 +1310,7 @@ impl Dwm {
 
         self.drw.setscheme(&self.scheme[SCHEME_NORM]);
         self.setnormalfont();
+        self.stextdraw = buf;
 
         ret
     }
@@ -1444,6 +1494,37 @@ impl Dwm {
             }
         }
         result
+    }
+
+    /// The pid of the status bar program (`statusbar`), -1 if it is not
+    /// running. The last one found is reused while its argv[0] still names
+    /// the status bar; otherwise /proc is searched like `pidof -s` does.
+    fn getstatusbarpid(&self) -> libc::pid_t {
+        let name = self.config.statusbar.as_bytes();
+        let isstatusbar = |pid: libc::pid_t| {
+            let Ok(cmdline) = std::fs::read(format!("/proc/{}/cmdline", pid)) else {
+                return false;
+            };
+            let argv0 = cmdline.split(|&b| b == 0).next().unwrap_or(&[]);
+            let base = argv0.rsplit(|&b| b == b'/').next().unwrap_or(&[]);
+            !base.is_empty() && base == name
+        };
+
+        if self.statuspid > 0 && isstatusbar(self.statuspid) {
+            return self.statuspid;
+        }
+        let Ok(dir) = std::fs::read_dir("/proc") else {
+            return -1;
+        };
+        for entry in dir.flatten() {
+            let pid = entry.file_name().to_str().and_then(|s| s.parse::<libc::pid_t>().ok());
+            if let Some(pid) = pid {
+                if pid > 0 && isstatusbar(pid) {
+                    return pid;
+                }
+            }
+        }
+        -1
     }
 
     /// Read a text property into `text` (at most `size - 1` bytes, like the
@@ -2616,6 +2697,26 @@ impl Dwm {
             // SAFETY: plain Xlib call on a managed window.
             unsafe { XMoveWindow(self.dpy, cl.win, width(cl) * -2, cl.y) };
         }
+    }
+
+    /// Send the clicked status block's signal (statussig) to the status bar,
+    /// with the button (`arg.i`) as the value, so it runs the block's command
+    /// with BLOCK_BUTTON set (statuscmd).
+    pub fn sigstatusbar(&mut self, arg: &Arg) {
+        if self.statussig == 0 {
+            return;
+        }
+        let mut sv = libc::sigval { sival_ptr: ptr::null_mut() };
+        // SAFETY: sival_int is the first 4 bytes of the sigval union, which
+        // the libc crate only declares with its sival_ptr member.
+        unsafe { ptr::write_unaligned(&mut sv as *mut libc::sigval as *mut c_int, arg.i()) };
+        self.statuspid = self.getstatusbarpid();
+        if self.statuspid <= 0 {
+            return;
+        }
+
+        // SAFETY: sigqueue() on a pid with a plain signal number and value.
+        unsafe { libc::sigqueue(self.statuspid, libc::SIGRTMIN() + self.statussig, sv) };
     }
 
     pub fn spawn(&mut self, arg: &Arg) {

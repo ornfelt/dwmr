@@ -53,7 +53,7 @@ A few notes on the format:
   zoom, view, killclient, setlayout, togglefloating, togglefullscr,
   togglesticky, togglescratch, tag, focusmon, tagmon, toggleview, toggletag,
   shifttag, shiftview, shiftviewclients, defaultgaps, incrgaps, togglegaps,
-  togglebgaps, quit, movemouse, resizemouse.
+  togglebgaps, sigstatusbar, quit, movemouse, resizemouse.
   Layouts: spiral, tile, bstack, dwindle, deck, monocle, centeredmaster,
   centeredfloatingmaster, none.
 - `scratchpads` is a list of `{ name, cmd }` (dwm's scratchpads patch). Each
@@ -84,6 +84,14 @@ A few notes on the format:
   `statusbigfonts` (`[]` for none) until `^N^`, e.g. for a block's icon.
   Other codes (`^r`, `^b`, `^d`, `^f`) are ignored; an unterminated `^` ends
   the text.
+- Clickable status blocks (dwm's statuscmd patch): a status bar like
+  dwmblocksr or dwmblocks puts its block's signal as a byte (1..31) before
+  each block. These bytes are not drawn. A click on the status text runs the
+  button's function with that block's signal remembered, and `sigstatusbar`
+  sends it to the program named `statusbar` (default `"dwmblocksr"`, found
+  by process name) as SIGRTMIN+signal with the `arg.i` as value; the program
+  then runs the block's command with `BLOCK_BUTTON` set to it. By default
+  Button1..3 on the status text send 1..3.
 - `arg = { v = "termcmd" }` refers to an entry of `commands`;
   `arg = { v = "layouts[2]" }` to an entry of `layouts`. In `dmenucmd` the
   argument after `-m` is replaced with the selected monitor (dwm's dmenumon).

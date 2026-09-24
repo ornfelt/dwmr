@@ -185,6 +185,9 @@ pub struct Config {
     /* key definitions */
     pub modkey: u32,
     pub commands: Vec<Rc<Command>>,
+    /// The status bar program that sigstatusbar() signals (statuscmd's
+    /// `STATUSBAR`), found by process name.
+    pub statusbar: String,
     pub keys: Vec<Key>,
     pub buttons: Vec<Button>,
 }
@@ -329,7 +332,9 @@ impl Default for Config {
             /* click                event mask      button          function        argument */
             b(CLK_LT_SYMBOL, 0, xlib::Button1, Dwm::setlayout, Arg::None),
             b(CLK_LT_SYMBOL, 0, xlib::Button3, Dwm::setlayout, Arg::Layout(5)),
-            b(CLK_STATUS_TEXT, 0, xlib::Button2, Dwm::spawn, Arg::V(termcmd.clone())),
+            b(CLK_STATUS_TEXT, 0, xlib::Button1, Dwm::sigstatusbar, Arg::I(1)),
+            b(CLK_STATUS_TEXT, 0, xlib::Button2, Dwm::sigstatusbar, Arg::I(2)),
+            b(CLK_STATUS_TEXT, 0, xlib::Button3, Dwm::sigstatusbar, Arg::I(3)),
             b(CLK_CLIENT_WIN, modkey, xlib::Button1, Dwm::movemouse, Arg::None),
             b(CLK_CLIENT_WIN, modkey, xlib::Button2, Dwm::defaultgaps, Arg::None),
             b(CLK_CLIENT_WIN, modkey, xlib::Button3, Dwm::resizemouse, Arg::None),
@@ -381,6 +386,7 @@ impl Default for Config {
             layouts,
             modkey,
             commands: vec![dmenucmd, termcmd],
+            statusbar: "dwmblocksr".into(),
             keys,
             buttons,
         }
@@ -476,6 +482,7 @@ struct RawConfig {
     modkey: Option<String>,
     /* commands */
     commands: Option<BTreeMap<String, Vec<String>>>,
+    statusbar: Option<String>,
     keys: Option<Vec<RawKeyEntry>>,
     /* button definitions */
     buttons: Option<Vec<RawButton>>,
@@ -734,6 +741,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "shifttag" => Dwm::shifttag,
         "shiftview" => Dwm::shiftview,
         "shiftviewclients" => Dwm::shiftviewclients,
+        "sigstatusbar" => Dwm::sigstatusbar,
         "spawn" => Dwm::spawn,
         "tag" => Dwm::tag,
         "tagmon" => Dwm::tagmon,
@@ -997,6 +1005,9 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
             })
             .collect::<Result<Vec<_>, ConfigError>>()?;
     }
+    if let Some(v) = raw.statusbar {
+        config.statusbar = v;
+    }
     let nlayouts = config.layouts.len();
 
     if let Some(keys) = raw.keys {
@@ -1142,6 +1153,7 @@ mod tests {
         let syms = |l: &[Layout]| l.iter().map(|l| (l.symbol.clone(), l.arrange.is_some())).collect::<Vec<_>>();
         assert_eq!(syms(&c.layouts), syms(&d.layouts));
         assert_eq!(c.commands, d.commands);
+        assert_eq!(c.statusbar, d.statusbar);
         let keys = |k: &[Key]| k.iter().map(|k| (k.mod_, k.keysym, k.arg.clone())).collect::<Vec<_>>();
         assert_eq!(keys(&c.keys), keys(&d.keys));
         let buttons = |b: &[Button]| b.iter().map(|b| (b.click, b.mask, b.button, b.arg.clone())).collect::<Vec<_>>();

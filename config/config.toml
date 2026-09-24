@@ -98,6 +98,11 @@ modkey = "Mod1Mask"
 commands.dmenucmd = ["dmenu_run", "-m", "0", "-fn", "monospace:size=10", "-nb", "#222222", "-nf", "#bbbbbb", "-sb", "#005577", "-sf", "#eeeeee"]
 commands.termcmd  = ["st"]
 
+# the status bar program, e.g. dwmblocksr or dwmblocks (statuscmd): a click on
+# a status block that starts with a signal byte runs sigstatusbar, which sends
+# that block's signal to the program with the button as the value
+statusbar = "dwmblocksr"
+
 keys = [
 	#  modifier                         key               function                  argument
 	{ mod = "MODKEY",                   key = "p",        func = "spawn",           arg = { v = "dmenucmd" } },
@@ -165,7 +170,9 @@ buttons = [
 	#  click                    event mask         button               function                  argument
 	{ click = "ClkLtSymbol",    mask = "0",        button = "Button1",  func = "setlayout" },
 	{ click = "ClkLtSymbol",    mask = "0",        button = "Button3",  func = "setlayout",       arg = { v = "layouts[5]" } },
-	{ click = "ClkStatusText",  mask = "0",        button = "Button2",  func = "spawn",           arg = { v = "termcmd" } },
+	{ click = "ClkStatusText",  mask = "0",        button = "Button1",  func = "sigstatusbar",    arg = { i = 1 } },
+	{ click = "ClkStatusText",  mask = "0",        button = "Button2",  func = "sigstatusbar",    arg = { i = 2 } },
+	{ click = "ClkStatusText",  mask = "0",        button = "Button3",  func = "sigstatusbar",    arg = { i = 3 } },
 	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button1",  func = "movemouse" },
 	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button2",  func = "defaultgaps" },
 	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button3",  func = "resizemouse" },

@@ -102,6 +102,20 @@ until
 e.g. for a block's icon. Other codes are ignored and an unterminated
 .B ^
 ends the text.
+.IP
+Bytes below 32 are not drawn: status bars like dwmblocksr put a block's
+signal as such a byte before each block, to make the blocks clickable
+(dwm's statuscmd patch).
+.TP
+.B Button1/Button2/Button3
+click on a status block sends the block's signal to the status bar program
+.B statusbar
+(default dwmblocksr) as SIGRTMIN+signal, with the button (1, 2 or 3) as the
+.BR sigqueue (3)
+value; the program then runs the block's command with
+.B BLOCK_BUTTON
+set to it
+.RB ( sigstatusbar ).
 .TP
 .B Button1
 click on a tag label to display all windows with that tag, click on the layout
