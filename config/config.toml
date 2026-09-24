@@ -167,8 +167,10 @@ keys = [
 	{ mod = "MODKEY|ControlMask|ShiftMask", key = "p",    func = "togglebar" },
 	{ mod = "MODKEY",                   key = "apostrophe", func = "togglescratch", arg = { ui = 0 } },
 	{ mod = "MODKEY|ShiftMask",         key = "apostrophe", func = "togglescratch", arg = { ui = 1 } },
-	# TAGKEYS(KEY, TAG): MODKEY+key views the tag, +Control toggles the view,
-	# +Shift tags the window and +Control+Shift toggles the window's tag.
+	# TAGKEYS(KEY, TAG): MODKEY+key views the tag, +Control tags the window,
+	# +Shift tags the window and views the tag, +Control+Shift toggles the
+	# view. With two monitors the odd tags live on the first and the even
+	# tags on the second: view and tag switch to the tag's monitor.
 	{ tagkeys = "1",                    tag = 0 },
 	{ tagkeys = "2",                    tag = 1 },
 	{ tagkeys = "3",                    tag = 2 },

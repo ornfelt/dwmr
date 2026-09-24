@@ -294,22 +294,25 @@ Move focused window to the next tag (shift-tools).
 .B Mod1\-Shift\-o
 Move focused window to the previous tag (shift-tools).
 .TP
+.B Mod1\-Control\-[1..n]
+Apply nth tag to focused window. With two monitors a window tagged with a
+tag of the other monitor moves there.
+.TP
 .B Mod1\-Shift\-[1..n]
-Apply nth tag to focused window.
+Apply nth tag to focused window and view that tag, on the tag's monitor.
 .TP
 .B Mod1\-Shift\-0
 Apply all tags to focused window.
 .TP
-.B Mod1\-Control\-Shift\-[1..n]
-Add/remove nth tag to/from focused window.
-.TP
 .B Mod1\-[1..n]
-View all windows with nth tag.
+View all windows with nth tag. With two monitors the odd tags are viewed on
+the first monitor and the even tags on the second. With one monitor the key
+of the current tag returns to the previous tag.
 .TP
 .B Mod1\-0
 View all windows with any tag.
 .TP
-.B Mod1\-Control\-[1..n]
+.B Mod1\-Control\-Shift\-[1..n]
 Add/remove all windows with nth tag to/from the view.
 .TP
 .B Mod1\-Shift\-q

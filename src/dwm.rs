@@ -462,6 +462,13 @@ impl Dwm {
         (1u32 << self.config.tags.len()) - 1
     }
 
+    /// `SCREEN_MASK`: the odd tags 1, 3, 5, ..., which live on the first
+    /// monitor; the even tags live on the second. A mask with any odd tag
+    /// (e.g. all tags) counts as odd.
+    fn screen_mask(&self) -> u32 {
+        0x5555_5555 & self.tagbits()
+    }
+
     /// `SPTAG(i)` (scratchpads); `i` must be a valid scratchpad index
     fn sptag(&self, i: usize) -> u32 {
         (1u32 << self.config.tags.len()) << i
@@ -1075,7 +1082,8 @@ impl Dwm {
         let mut ltsymbol = self.layouts[0].symbol.clone();
         truncate_utf8(&mut ltsymbol, LTSYMBOL_SIZE - 1);
         Monitor {
-            tagset: [1, 1],
+            /* odd tags on the first monitor, even tags on the second */
+            tagset: if self.mons.is_empty() { [1, 1] } else { [2, 2] },
             mfact: config.mfact,
             nmaster: config.nmaster,
             showbar: config.showbar,
@@ -2447,9 +2455,26 @@ impl Dwm {
         let old = self.clients[c].mon;
         self.arrange(Some(old));
         self.clients[c].mon = m;
-        /* assign tags of target monitor, without any visible scratchpad tags */
-        let tags = self.mons[m].tagset[self.mons[m].seltags] & !self.sptagmask();
-        self.clients[c].tags = if tags != 0 { tags } else { 1 };
+        /* assign tags of target monitor, without any visible scratchpad tags;
+         * with more than one monitor only the tags of m's parity (odd tags on
+         * the first monitor, even tags on the others), so a target viewing
+         * all tags does not put c on a tag of the wrong monitor */
+        let allowed = if self.mons.len() < 2 {
+            !0
+        } else if m == 0 {
+            self.screen_mask()
+        } else {
+            !self.screen_mask() & self.tagbits()
+        };
+        let tags = self.mons[m].tagset[self.mons[m].seltags] & !self.sptagmask() & allowed;
+        let lowest = allowed.isolate_lowest_one(); /* the lowest allowed tag */
+        self.clients[c].tags = if tags != 0 {
+            tags
+        } else if lowest != 0 {
+            lowest
+        } else {
+            1
+        };
         self.attach(c);
         self.attachstack(c);
         let mon = &self.mons[m];
@@ -3020,13 +3045,31 @@ impl Dwm {
     pub fn tag(&mut self, arg: &Arg) {
         let selmon = self.selmon;
         let tagmask = self.tagmask();
-        if let Some(sel) = self.mons[selmon].sel {
-            if arg.ui() & tagmask != 0 {
-                self.clients[sel].tags = arg.ui() & tagmask;
-                self.focus(None);
-                self.arrange(Some(selmon));
-            }
+        let Some(sel) = self.mons[selmon].sel else {
+            return;
+        };
+        if arg.ui() & tagmask == 0 {
+            return;
         }
+
+        if self.mons.len() > 1 {
+            let odd = arg.ui() & self.screen_mask() != 0;
+            if !odd && selmon != 0 {
+                /* moving to even tag, selected mon != first mon */
+                self.clients[sel].tags = arg.ui() & tagmask;
+            } else if odd && selmon == 0 {
+                /* moving to odd tag, selected mon == first mon */
+                self.clients[sel].tags = arg.ui() & tagmask;
+            } else {
+                self.tagnextmon(arg);
+                return;
+            }
+        } else {
+            self.clients[sel].tags = arg.ui() & tagmask;
+        }
+
+        self.focus(None);
+        self.arrange(Some(selmon));
     }
 
     pub fn tagmon(&mut self, arg: &Arg) {
@@ -3051,6 +3094,36 @@ impl Dwm {
         self.sendmonview(sel, m);
     }
 
+    fn tagnewmon(&mut self, arg: &Arg) {
+        let selmon = self.selmon;
+        let tagmask = self.tagmask();
+        if let Some(sel) = self.mons[selmon].sel {
+            if arg.ui() & tagmask != 0 {
+                self.clients[sel].tags = arg.ui() & tagmask;
+                self.focus(None);
+                self.arrange(Some(selmon));
+                self.view(arg);
+            }
+        }
+    }
+
+    fn tagnextmon(&mut self, arg: &Arg) {
+        let tagmask = self.tagmask();
+        let Some(sel) = self.mons[self.selmon].sel else {
+            return;
+        };
+        if self.mons.len() < 2 {
+            return;
+        }
+        let newmon = self.dirtomon(1);
+        self.sendmon(sel, newmon);
+        if arg.ui() & tagmask != 0 {
+            self.clients[sel].tags = arg.ui() & tagmask;
+            self.focus(None);
+            self.arrange(Some(newmon));
+        }
+    }
+
     pub fn tagnthmonview(&mut self, arg: &Arg) {
         let Some(sel) = self.mons[self.selmon].sel else {
             return;
@@ -3060,6 +3133,34 @@ impl Dwm {
         }
         let m = self.numtomon(arg.i());
         self.sendmonview(sel, m);
+    }
+
+    pub fn tagview(&mut self, arg: &Arg) {
+        let selmon = self.selmon;
+        let tagmask = self.tagmask();
+        let Some(sel) = self.mons[selmon].sel else {
+            return;
+        };
+        if arg.ui() & tagmask == 0 {
+            return;
+        }
+        if self.mons.len() > 1 {
+            let odd = arg.ui() & self.screen_mask() != 0;
+            if !odd && selmon == 0 {
+                /* first monitor and moving to even tag (second mon) */
+                self.tagnthmonview(&Arg::I(1));
+                self.tagnewmon(arg);
+                return;
+            } else if odd && selmon != 0 {
+                self.tagnthmonview(&Arg::I(0));
+                self.tagnewmon(arg);
+                return;
+            }
+        }
+        self.clients[sel].tags = arg.ui() & tagmask;
+        self.focus(None);
+        self.arrange(Some(selmon));
+        self.view(arg);
     }
 
     pub fn togglebar(&mut self, _arg: &Arg) {
@@ -3419,6 +3520,32 @@ impl Dwm {
             let m = self.createmon();
             self.mons.push(m);
         }
+
+        /* Logic for moving clients: only when monitors were added.
+         * Odd tags live on the first monitor and even tags on the second,
+         * so with two or more monitors move clients that have only even
+         * tags over. Like view() and tag(), a client with any odd tag
+         * (e.g. one on all tags) stays on the first monitor, and so do
+         * scratchpads, which have no normal tag bit. */
+        if nn > n && nn >= 2 {
+            let tagbits = self.tagbits();
+            let screen_mask = self.screen_mask();
+            let mut c = self.mons[0].clients;
+            while let Some(i) = c {
+                let next_client = self.clients[i].next;
+
+                /* Check if the client belongs to the second monitor */
+                if self.clients[i].tags & tagbits != 0 && self.clients[i].tags & screen_mask == 0 {
+                    self.detach(i); /* Detach from primary monitor */
+                    self.detachstack(i);
+
+                    self.clients[i].mon = 1; /* Assign to secondary monitor */
+                    self.attach(i); /* Attach to secondary monitor */
+                    self.attachstack(i);
+                }
+                c = next_client;
+            }
+        }
         for (i, u) in unique.iter().enumerate().take(self.mons.len()) {
             let m = &self.mons[i];
             if i >= n
@@ -3624,12 +3751,29 @@ impl Dwm {
     }
 
     pub fn view(&mut self, arg: &Arg) {
-        let selmon = self.selmon;
         let tagmask = self.tagmask();
-        let seltags = self.mons[selmon].seltags;
-        if (arg.ui() & tagmask) == self.mons[selmon].tagset[seltags] {
-            return;
+        if self.mons.len() > 1 {
+            /* odd tags on first mon, even tags on second. Focus the target
+             * mon first so the check below uses its tagset. Arg {0}
+             * (previous tagset) stays on the current mon. */
+            if arg.ui() & tagmask != 0 {
+                let n = if arg.ui() & self.screen_mask() != 0 { 0 } else { 1 };
+                self.focusnthmon(&Arg::I(n));
+            }
+            let m = &self.mons[self.selmon];
+            if (arg.ui() & tagmask) == m.tagset[m.seltags] {
+                return;
+            }
+        } else {
+            let m = &self.mons[self.selmon];
+            if (arg.ui() & tagmask) == m.tagset[m.seltags] {
+                /* the key of the current tag goes back to the previous tagset */
+                self.view(&Arg::Ui(0));
+                return;
+            }
         }
+
+        let selmon = self.selmon;
         self.mons[selmon].seltags ^= 1; /* toggle sel tagset */
         if arg.ui() & tagmask != 0 {
             let seltags = self.mons[selmon].seltags;

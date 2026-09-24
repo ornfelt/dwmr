@@ -66,10 +66,21 @@ A few notes on the format:
 - Keys are keysym names without the `XK_` prefix (`"Return"`, `"space"`,
   `"comma"`, `"p"`). Modifiers are `MODKEY`, `ShiftMask`, `ControlMask`,
   `Mod1Mask`..`Mod5Mask`, joined with `|`.
-- `{ tagkeys = "1", tag = 0 }` in `keys` expands like dwm's `TAGKEYS` macro.
+- `{ tagkeys = "1", tag = 0 }` in `keys` expands like dwm's `TAGKEYS` macro,
+  but to my bindings: `MODKEY` views the tag, `+Control` tags the window,
+  `+Shift` tags it and views the tag (`tagview`), `+Control+Shift` toggles
+  the view.
+- Two monitors split the tags: the odd tags (1, 3, 5, ...) live on the first
+  monitor and the even tags on the second, which starts on tag 2. `view`
+  focuses the tag's monitor first, `tag` and `tagview` move the window over
+  when the tag belongs to the other monitor, `sendmonview` only gives a
+  window tags of the target monitor's parity, and a monitor plugged in takes
+  over the windows that have only even tags. A mask with any odd tag, like
+  all tags, counts as odd. Pressing the key of the current tag returns to the
+  previous tag only with one monitor.
 - Functions: spawn, togglebar, focusstack, pushstack, incnmaster, setmfact,
   zoom, view, killclient, setlayout, togglefloating, togglefullscr,
-  togglesticky, togglescratch, tag, focusmon, focusnthmon, tagmon,
+  togglesticky, togglescratch, tag, tagview, focusmon, focusnthmon, tagmon,
   tagmonview, tagnthmonview, togglebars, toggleview, toggletag, shifttag,
   shiftview, shiftviewclients, defaultgaps, incrgaps, togglegaps,
   togglebgaps, sigstatusbar, quit, movemouse, resizemouse.

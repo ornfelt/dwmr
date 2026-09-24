@@ -196,9 +196,9 @@ pub struct Config {
 fn tagkeys(keys: &mut Vec<Key>, modkey: u32, key: KeySym, tag: u32) {
     let tag = Arg::Ui(1 << tag);
     keys.push(Key { mod_: modkey, keysym: key, func: Dwm::view, arg: tag.clone() });
-    keys.push(Key { mod_: modkey | xlib::ControlMask, keysym: key, func: Dwm::toggleview, arg: tag.clone() });
-    keys.push(Key { mod_: modkey | xlib::ShiftMask, keysym: key, func: Dwm::tag, arg: tag.clone() });
-    keys.push(Key { mod_: modkey | xlib::ControlMask | xlib::ShiftMask, keysym: key, func: Dwm::toggletag, arg: tag });
+    keys.push(Key { mod_: modkey | xlib::ControlMask, keysym: key, func: Dwm::tag, arg: tag.clone() });
+    keys.push(Key { mod_: modkey | xlib::ShiftMask, keysym: key, func: Dwm::tagview, arg: tag.clone() });
+    keys.push(Key { mod_: modkey | xlib::ControlMask | xlib::ShiftMask, keysym: key, func: Dwm::toggleview, arg: tag });
 }
 
 impl Default for Config {
@@ -761,6 +761,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "tagmon" => Dwm::tagmon,
         "tagmonview" => Dwm::tagmonview,
         "tagnthmonview" => Dwm::tagnthmonview,
+        "tagview" => Dwm::tagview,
         "togglebar" => Dwm::togglebar,
         "togglebars" => Dwm::togglebars,
         "togglebgaps" => Dwm::togglebgaps,
