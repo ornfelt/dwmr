@@ -13,7 +13,7 @@ mod xres;
 
 use std::ptr;
 
-use x11::xlib::{XCloseDisplay, XOpenDisplay, XSupportsLocale};
+use x11::xlib::{XCloseDisplay, XOpenDisplay, XSupportsLocale, XrmInitialize};
 
 use crate::dwm::Dwm;
 use crate::util::die;
@@ -45,6 +45,9 @@ fn main() {
     }
     let mut dwm = Dwm::new(dpy, config);
     dwm.checkotherwm();
+    // SAFETY: XrmInitialize has no preconditions.
+    unsafe { XrmInitialize() };
+    dwm.load_xresources();
     dwm.setup();
     dwm.scan();
     dwm.runautostart();

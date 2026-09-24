@@ -28,7 +28,7 @@
  */
 #![allow(non_upper_case_globals)] /* Xlib event/constant names are used as-is */
 
-use std::ffi::{CString, OsStr};
+use std::ffi::{CStr, CString, OsStr};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::mem;
@@ -47,8 +47,8 @@ use crate::config::{
     Arg, ArrangeFn, Command, Config, Layout, CLK_CLIENT_WIN, CLK_LT_SYMBOL, CLK_ROOT_WIN, CLK_STATUS_TEXT, CLK_TAG_BAR,
     SCHEME_NORM, SCHEME_SEL,
 };
-use crate::drw::{Clr, Cur, Drw, Fnt, CLR_NONE, COL_BORDER};
-use crate::util::{atoi, die, truncate_utf8};
+use crate::drw::{Clr, Cur, Drw, Fnt, CLR_NONE, COL_BG, COL_BORDER, COL_FG};
+use crate::util::{atoi, die, strtof, strtoul, truncate_utf8};
 use crate::xres::{XResClientIdSpec, XResClientIdValue, XResClientIdsDestroy, XResGetClientPid, XResQueryClientIds, XResQueryExtension, XRES_CLIENT_ID_PID_MASK};
 use crate::VERSION;
 
@@ -274,6 +274,19 @@ impl StatusClr {
         col5: CLR_NONE,
         col6: CLR_NONE,
     };
+}
+
+/* Xresources preferences */
+/// The `type` and `dst` of a `ResourcePref` in one: what the resource is
+/// parsed as and the config value it replaces. STRING resources are "#RRGGBB"
+/// colors; INTEGER ones go to dwm's `unsigned int`, `int` and int-as-flag
+/// variables, which are `u32`, `i32` and `bool` here; FLOAT to a `float`.
+enum ResourceDst<'a> {
+    String(&'a mut String),
+    Uint(&'a mut u32),
+    Int(&'a mut i32),
+    Flag(&'a mut bool),
+    Float(&'a mut f32),
 }
 
 /// All of dwm's global state.
@@ -1662,6 +1675,50 @@ impl Dwm {
         }
     }
 
+    /// Apply the X resources `dwm.<name>` (xresources patch) on top of the
+    /// config file, the way the patch applies them on top of config.h. Called
+    /// before setup(), while nothing shares the config yet, so it is changed
+    /// in place.
+    pub fn load_xresources(&mut self) {
+        // SAFETY: dpy is an open display; the returned string belongs to it.
+        let resm = unsafe { XResourceManagerString(self.dpy) };
+        if resm.is_null() {
+            return;
+        }
+
+        // SAFETY: resm is a NUL-terminated string owned by the display.
+        let db = unsafe { XrmGetStringDatabase(resm) };
+        if db.is_null() {
+            return;
+        }
+        if let Some(config) = Rc::get_mut(&mut self.config) {
+            /* the resources[] table of config.h; the same resource may set
+             * several values, and sel's fg/bg are deliberately inverted */
+            /* name             dst */
+            Self::resource_load(db, "color0", ResourceDst::String(&mut config.colors[SCHEME_NORM][COL_BORDER]));
+            Self::resource_load(db, "foreground", ResourceDst::String(&mut config.colors[SCHEME_SEL][COL_BORDER]));
+            Self::resource_load(db, "color0", ResourceDst::String(&mut config.colors[SCHEME_NORM][COL_BG]));
+            Self::resource_load(db, "foreground", ResourceDst::String(&mut config.colors[SCHEME_NORM][COL_FG]));
+            Self::resource_load(db, "color0", ResourceDst::String(&mut config.colors[SCHEME_SEL][COL_FG]));
+            Self::resource_load(db, "foreground", ResourceDst::String(&mut config.colors[SCHEME_SEL][COL_BG]));
+            Self::resource_load(db, "borderpx", ResourceDst::Uint(&mut config.borderpx));
+            Self::resource_load(db, "snap", ResourceDst::Uint(&mut config.snap));
+            Self::resource_load(db, "showbar", ResourceDst::Flag(&mut config.showbar));
+            Self::resource_load(db, "topbar", ResourceDst::Flag(&mut config.topbar));
+            Self::resource_load(db, "nmaster", ResourceDst::Int(&mut config.nmaster));
+            Self::resource_load(db, "resizehints", ResourceDst::Flag(&mut config.resizehints));
+            Self::resource_load(db, "mfact", ResourceDst::Float(&mut config.mfact));
+            Self::resource_load(db, "gappih", ResourceDst::Uint(&mut config.gappih));
+            Self::resource_load(db, "gappiv", ResourceDst::Uint(&mut config.gappiv));
+            Self::resource_load(db, "gappoh", ResourceDst::Uint(&mut config.gappoh));
+            Self::resource_load(db, "gappov", ResourceDst::Uint(&mut config.gappov));
+            Self::resource_load(db, "swallowfloating", ResourceDst::Flag(&mut config.swallowfloating));
+            Self::resource_load(db, "smartgaps", ResourceDst::Flag(&mut config.smartgaps));
+        }
+        // SAFETY: db came from XrmGetStringDatabase and is not used afterwards.
+        unsafe { XrmDestroyDatabase(db) };
+    }
+
     fn manage(&mut self, w: Window, wa: &XWindowAttributes) {
         let mut trans: Window = 0;
         let mut term = None;
@@ -2169,6 +2226,58 @@ impl Dwm {
             self.sendmon(c, m);
             self.selmon = m;
             self.focus(None);
+        }
+    }
+
+    /// Look up `dwm.<name>` (class `*`) in `db` and store it in `dst`. A
+    /// value that does not parse leaves `dst` as it is.
+    fn resource_load(db: XrmDatabase, name: &str, dst: ResourceDst) {
+        let Ok(fullname) = CString::new(format!("dwm.{}", name)) else {
+            return;
+        };
+        let mut ty: *mut c_char = ptr::null_mut();
+        let mut ret = XrmValue { size: 0, addr: ptr::null_mut() };
+
+        // SAFETY: db is a live database and both names are NUL-terminated;
+        // type and ret are only read when XrmGetResource found the resource,
+        // and then point into db, which outlives this function.
+        let value = unsafe {
+            if XrmGetResource(db, fullname.as_ptr(), c"*".as_ptr(), &mut ty, &mut ret) == 0
+                || ret.addr.is_null()
+                || ty.is_null()
+                || CStr::from_ptr(ty).to_bytes() != b"String"
+            {
+                return;
+            }
+            CStr::from_ptr(ret.addr).to_string_lossy()
+        };
+        match dst {
+            /* all STRING resources are "#RRGGBB" char[8] buffers */
+            ResourceDst::String(s) => {
+                if value.len() < 8 {
+                    *s = value.into_owned();
+                }
+            }
+            ResourceDst::Uint(u) => {
+                if let Some(v) = strtoul(&value) {
+                    *u = v as u32;
+                }
+            }
+            ResourceDst::Int(i) => {
+                if let Some(v) = strtoul(&value) {
+                    *i = v as i32;
+                }
+            }
+            ResourceDst::Flag(b) => {
+                if let Some(v) = strtoul(&value) {
+                    *b = v != 0;
+                }
+            }
+            ResourceDst::Float(f) => {
+                if let Some(v) = strtof(&value) {
+                    *f = v;
+                }
+            }
         }
     }
 

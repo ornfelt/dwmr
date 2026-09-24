@@ -317,6 +317,36 @@ the defaults are used, so the window manager always starts. A default file is
 installed with
 .B make install-config
 and shipped as config/config.toml in the source tree.
+.SS X resources
+After the file, dwmr reads the X resources of the display (the
+.B RESOURCE_MANAGER
+property on the root window, as set by
+.BR xrdb (1))
+and applies these, if present, on top of the config values; a value that does
+not parse is ignored.
+.TP
+.B dwm.color0
+The normal border and background color and the selected foreground color.
+.TP
+.B dwm.foreground
+The selected border and background color and the normal foreground color.
+(The selected foreground and background are inverted on purpose, so the
+selected tag is shown reversed.)
+Both are "#RRGGBB" colors.
+.TP
+.B dwm.borderpx, dwm.snap, dwm.gappih, dwm.gappiv, dwm.gappoh, dwm.gappov
+Integers.
+.TP
+.B dwm.showbar, dwm.topbar, dwm.resizehints, dwm.swallowfloating, dwm.smartgaps
+Integers, 0 for false and anything else for true.
+.TP
+.B dwm.nmaster
+Integer.
+.TP
+.B dwm.mfact
+Floating point number.
+.PP
+The resources are read once at startup; restart dwmr after changing them.
 .SH SEE ALSO
 .BR dwm (1),
 .BR dmenu (1),

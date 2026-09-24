@@ -42,6 +42,24 @@ configuration. A file that fails to parse is reported on stderr and ignored,
 so the window manager always starts. See `config/config.toml` for the
 commented default.
 
+### X resources
+
+After the file, dwmr reads the X resources of the display (what `xrdb` loads
+from `~/.Xresources`) and applies these, if present, on top of the config
+values, like dwm's xresources patch does on top of config.h:
+
+| resource                                                               | sets                                                     |
+|------------------------------------------------------------------------|----------------------------------------------------------|
+| `dwm.color0`                                                           | norm border, norm bg, sel fg (a `#RRGGBB` color)         |
+| `dwm.foreground`                                                       | sel border, norm fg, sel bg (a `#RRGGBB` color)          |
+| `dwm.borderpx`, `dwm.snap`, `dwm.gappih`, `dwm.gappiv`, `dwm.gappoh`, `dwm.gappov`, `dwm.nmaster` | integers                     |
+| `dwm.showbar`, `dwm.topbar`, `dwm.resizehints`, `dwm.swallowfloating`, `dwm.smartgaps` | integers, 0 is false            |
+| `dwm.mfact`                                                            | a float                                                  |
+
+The selected foreground and background are inverted on purpose, so the
+selected tag shows reversed. A value that does not parse is ignored. The
+resources are read once at startup.
+
 A few notes on the format:
 
 - Masks can be written like in C: `"1 << 8"`, `"~0"`, `"0x1ff"`, `"1 | 2"`.
