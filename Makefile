@@ -6,10 +6,18 @@ VERSION = 6.8.0
 # paths
 PREFIX = /usr/local
 MANPREFIX = ${PREFIX}/share/man
-CONFDIR = ${HOME}/.config/dwmr
 
 CARGO = cargo
 BIN = target/release/dwmr
+USERHOME = ${HOME}
+
+# cargo/rustup toolchains are per user, so under `sudo make install` build
+# (and find the config dir) as the invoking user, not as root
+ifneq (${SUDO_USER},)
+CARGO = sudo -u ${SUDO_USER} -H cargo
+USERHOME = $(shell getent passwd ${SUDO_USER} | cut -d: -f6)
+endif
+CONFDIR = ${USERHOME}/.config/dwmr
 
 all: ${BIN}
 
