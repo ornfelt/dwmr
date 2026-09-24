@@ -98,11 +98,15 @@ modkey = "Mod1Mask"
 commands.dmenucmd = ["dmenu_run", "-m", "0", "-fn", "monospace:size=10", "-nb", "#222222", "-nf", "#bbbbbb", "-sb", "#005577", "-sf", "#eeeeee"]
 commands.termcmd  = ["st"]
 
-# the status bar program, e.g. dwmblocksr or dwmblocks. dwmr (re)starts it on
-# startup ("" starts none). A click on a status block that starts with a signal
-# byte runs sigstatusbar, which sends that block's signal to the program with
-# the button as the value (statuscmd)
+# the status bar program, e.g. dwmblocksr or dwmblocks, found by process name.
+# A click on a status block that starts with a signal byte runs sigstatusbar,
+# which sends that block's signal to the program with the button as the value
+# (statuscmd). "" disables the clicks
 statusbar = "dwmblocksr"
+
+# the command dwmr runs once at startup, after the existing windows have been
+# taken over; here it (re)starts the status bar. [] runs none
+autostart = ["sh", "-c", "killall -q dwmblocksr; dwmblocksr &"]
 
 keys = [
 	#  modifier                         key               function                  argument

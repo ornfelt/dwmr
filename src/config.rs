@@ -188,6 +188,9 @@ pub struct Config {
     /// The status bar program that sigstatusbar() signals (statuscmd's
     /// `STATUSBAR`), found by process name.
     pub statusbar: String,
+    /// The command runautostart() runs once at startup, after scan(); empty
+    /// runs none.
+    pub autostart: Vec<String>,
     pub keys: Vec<Key>,
     pub buttons: Vec<Button>,
 }
@@ -400,6 +403,7 @@ impl Default for Config {
             modkey,
             commands: vec![dmenucmd, termcmd],
             statusbar: "dwmblocksr".into(),
+            autostart: ["sh", "-c", "killall -q dwmblocksr; dwmblocksr &"].iter().map(|s| s.to_string()).collect(),
             keys,
             buttons,
         }
@@ -496,6 +500,7 @@ struct RawConfig {
     /* commands */
     commands: Option<BTreeMap<String, Vec<String>>>,
     statusbar: Option<String>,
+    autostart: Option<Vec<String>>,
     keys: Option<Vec<RawKeyEntry>>,
     /* button definitions */
     buttons: Option<Vec<RawButton>>,
@@ -1024,11 +1029,15 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
             .collect::<Result<Vec<_>, ConfigError>>()?;
     }
     if let Some(v) = raw.statusbar {
-        /* it is run by runautostart() through the shell */
+        /* getstatusbarpid() matches it against process names */
         if !v.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)) {
             return err("statusbar must be a program name (letters, digits, '.', '_', '-') or \"\"");
         }
         config.statusbar = v;
+    }
+    if let Some(v) = raw.autostart {
+        /* an argv like the commands; [] runs nothing */
+        config.autostart = v;
     }
     let nlayouts = config.layouts.len();
 
@@ -1176,6 +1185,7 @@ mod tests {
         assert_eq!(syms(&c.layouts), syms(&d.layouts));
         assert_eq!(c.commands, d.commands);
         assert_eq!(c.statusbar, d.statusbar);
+        assert_eq!(c.autostart, d.autostart);
         let keys = |k: &[Key]| k.iter().map(|k| (k.mod_, k.keysym, k.arg.clone())).collect::<Vec<_>>();
         assert_eq!(keys(&c.keys), keys(&d.keys));
         let buttons = |b: &[Button]| b.iter().map(|b| (b.click, b.mask, b.button, b.arg.clone())).collect::<Vec<_>>();

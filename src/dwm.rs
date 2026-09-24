@@ -323,7 +323,7 @@ pub struct Dwm {
     dpy: *mut Display,
     drw: Drw,
     mons: Vec<Monitor>,
-    selmon: MonId,
+    pub selmon: MonId,
     root: Window,
     wmcheckwin: Window,
     /// Client slab plus its free list.
@@ -652,7 +652,7 @@ impl Dwm {
     }
 
     /// `arrange(m)`; `None` arranges all monitors (`arrange(NULL)`).
-    fn arrange(&mut self, m: Option<MonId>) {
+    pub fn arrange(&mut self, m: Option<MonId>) {
         match m {
             Some(m) => {
                 let stack = self.mons[m].stack;
@@ -2366,20 +2366,16 @@ impl Dwm {
         }
     }
 
-    /// Restart the status bar (`statusbar`) with every dwmr start, like the
-    /// autostart patch's runautostart() in my dwm starts dwmblocks. `-w`
-    /// (not in dwm) waits for the old instance to exit, which would otherwise
-    /// clear the root name after the new one has set it. `statusbar = ""`
-    /// starts nothing.
+    /// Run the configured `autostart` command once at startup (my dwm's
+    /// runautostart() calls system("killall -q dwmblocks; dwmblocks &")).
+    /// It goes through spawn(), so it does not block and the child is
+    /// reaped like every other program dwmr starts. An empty command runs
+    /// nothing.
     pub fn runautostart(&mut self) {
-        let statusbar = &self.config.statusbar;
-        if statusbar.is_empty() {
+        if self.config.autostart.is_empty() {
             return;
         }
-        let cmd = Rc::new(Command {
-            name: "autostart".into(),
-            argv: vec!["/bin/sh".into(), "-c".into(), format!("killall -q -w {0}; exec {0}", statusbar)],
-        });
+        let cmd = Rc::new(Command { name: "autostart".into(), argv: self.config.autostart.clone() });
         self.spawn(&Arg::V(cmd));
     }
 

@@ -51,6 +51,8 @@ fn main() {
     dwm.setup();
     dwm.scan();
     dwm.runautostart();
+    let selmon = dwm.selmon;
+    dwm.arrange(Some(selmon));
     dwm.run();
     dwm.cleanup();
     // SAFETY: dpy is a valid display that nothing uses afterwards.

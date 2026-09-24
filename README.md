@@ -128,10 +128,11 @@ A few notes on the format:
   by process name) as SIGRTMIN+signal with the `arg.i` as value; the program
   then runs the block's command with `BLOCK_BUTTON` set to it. By default
   Button1..3 on the status text send 1..3.
-- On startup dwmr (re)starts the status bar: it runs `killall -q -w
-  <statusbar>; <statusbar>` in the background, so `dwmblocksr` needs no
-  separate autostart. `statusbar = ""` starts nothing and disables the
-  clicks.
+- `autostart` is a command (an argv list) that dwmr runs once at startup,
+  after the existing windows have been taken over, without waiting for it.
+  The default `["sh", "-c", "killall -q dwmblocksr; dwmblocksr &"]`
+  (re)starts the status bar, so `dwmblocksr` needs no separate autostart.
+  `autostart = []` runs nothing; `statusbar = ""` disables the clicks.
 - `arg = { v = "termcmd" }` refers to an entry of `commands`;
   `arg = { v = "layouts[2]" }` to an entry of `layouts`. In `dmenucmd` the
   argument after `-m` is replaced with the selected monitor (dwm's dmenumon).

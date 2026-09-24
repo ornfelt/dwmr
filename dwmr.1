@@ -103,11 +103,14 @@ e.g. for a block's icon. Other codes are ignored and an unterminated
 .B ^
 ends the text.
 .IP
-On startup dwmr kills a running
-.B statusbar
-program (default dwmblocksr) and starts it again;
+On startup dwmr runs the
+.B autostart
+command once, after the existing windows have been taken over; by default it
+kills a running dwmblocksr and starts it again.
+.B autostart = []
+runs nothing, and
 .B statusbar = \(dq\(dq
-starts none.
+disables the status clicks.
 .IP
 Bytes below 32 are not drawn: status bars like dwmblocksr put a block's
 signal as such a byte before each block, to make the blocks clickable
