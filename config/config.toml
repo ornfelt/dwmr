@@ -98,12 +98,11 @@ keys = [
 ]
 
 # button definitions
-# click can be ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle, ClkClientWin, or ClkRootWin
+# click can be ClkTagBar, ClkLtSymbol, ClkStatusText, ClkClientWin, or ClkRootWin
 buttons = [
 	#  click                    event mask         button               function                  argument
 	{ click = "ClkLtSymbol",    mask = "0",        button = "Button1",  func = "setlayout" },
 	{ click = "ClkLtSymbol",    mask = "0",        button = "Button3",  func = "setlayout",       arg = { v = "layouts[2]" } },
-	{ click = "ClkWinTitle",    mask = "0",        button = "Button2",  func = "zoom" },
 	{ click = "ClkStatusText",  mask = "0",        button = "Button2",  func = "spawn",           arg = { v = "termcmd" } },
 	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button1",  func = "movemouse" },
 	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button2",  func = "togglefloating" },

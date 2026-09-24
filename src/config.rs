@@ -25,9 +25,8 @@ pub const SCHEME_SEL: usize = 1; /* color schemes */
 pub const CLK_TAG_BAR: u32 = 0;
 pub const CLK_LT_SYMBOL: u32 = 1;
 pub const CLK_STATUS_TEXT: u32 = 2;
-pub const CLK_WIN_TITLE: u32 = 3;
-pub const CLK_CLIENT_WIN: u32 = 4;
-pub const CLK_ROOT_WIN: u32 = 5; /* clicks */
+pub const CLK_CLIENT_WIN: u32 = 3;
+pub const CLK_ROOT_WIN: u32 = 4; /* clicks */
 
 /// A key/button action, e.g. `Dwm::spawn`.
 pub type KeyFn = fn(&mut Dwm, &Arg);
@@ -242,13 +241,12 @@ impl Default for Config {
         keys.push(k(modkey | xlib::ShiftMask, XK_q, Dwm::quit, Arg::None));
 
         /* button definitions */
-        /* click can be ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle, ClkClientWin, or ClkRootWin */
+        /* click can be ClkTagBar, ClkLtSymbol, ClkStatusText, ClkClientWin, or ClkRootWin */
         let b = |click: u32, mask: u32, button: u32, func: KeyFn, arg: Arg| Button { click, mask, button, func, arg };
         let buttons = vec![
             /* click                event mask      button          function        argument */
             b(CLK_LT_SYMBOL, 0, xlib::Button1, Dwm::setlayout, Arg::None),
             b(CLK_LT_SYMBOL, 0, xlib::Button3, Dwm::setlayout, Arg::Layout(2)),
-            b(CLK_WIN_TITLE, 0, xlib::Button2, Dwm::zoom, Arg::None),
             b(CLK_STATUS_TEXT, 0, xlib::Button2, Dwm::spawn, Arg::V(termcmd.clone())),
             b(CLK_CLIENT_WIN, modkey, xlib::Button1, Dwm::movemouse, Arg::None),
             b(CLK_CLIENT_WIN, modkey, xlib::Button2, Dwm::togglefloating, Arg::None),
@@ -561,7 +559,6 @@ fn parse_click(name: &str) -> Result<u32, ConfigError> {
         "ClkTagBar" => CLK_TAG_BAR,
         "ClkLtSymbol" => CLK_LT_SYMBOL,
         "ClkStatusText" => CLK_STATUS_TEXT,
-        "ClkWinTitle" => CLK_WIN_TITLE,
         "ClkClientWin" => CLK_CLIENT_WIN,
         "ClkRootWin" => CLK_ROOT_WIN,
         other => return err(format!("unknown click '{}'", other)),

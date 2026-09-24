@@ -41,7 +41,7 @@ use x11::xinerama::{XineramaIsActive, XineramaQueryScreens, XineramaScreenInfo};
 use x11::xlib::*;
 
 use crate::config::{
-    Arg, Config, Layout, CLK_CLIENT_WIN, CLK_LT_SYMBOL, CLK_ROOT_WIN, CLK_STATUS_TEXT, CLK_TAG_BAR, CLK_WIN_TITLE,
+    Arg, Config, Layout, CLK_CLIENT_WIN, CLK_LT_SYMBOL, CLK_ROOT_WIN, CLK_STATUS_TEXT, CLK_TAG_BAR,
     SCHEME_NORM, SCHEME_SEL,
 };
 use crate::drw::{Clr, Cur, Drw, COL_BORDER};
@@ -555,9 +555,9 @@ impl Dwm {
                 click = CLK_LT_SYMBOL;
             } else if ev.x > self.mons[self.selmon].ww - Self::textw(&mut self.drw, self.lrpad, &self.stext) + self.lrpad - 2 {
                 click = CLK_STATUS_TEXT;
-            } else {
-                click = CLK_WIN_TITLE;
             }
+            /* notitle: the space between the layout symbol and the status is
+             * no click target; click stays ClkRootWin */
         } else if let Some(c) = self.wintoclient(ev.window) {
             if config.focusonwheel || (ev.button != Button4 && ev.button != Button5) {
                 /* deliberately no restack() here, unlike dwm and the focusonclick
@@ -905,16 +905,9 @@ impl Dwm {
 
         let w = self.mons[m].ww - tw - x;
         if w > bh {
-            if let Some(sel) = self.mons[m].sel {
-                self.drw.setscheme(&self.scheme[if m == self.selmon { SCHEME_SEL } else { SCHEME_NORM }]);
-                self.drw.text(x, 0, w as u32, bh as u32, (lrpad / 2) as u32, &self.clients[sel].name, false);
-                if self.clients[sel].isfloating {
-                    self.drw.rect(x + boxs, boxs, boxw, boxw, self.clients[sel].isfixed, false);
-                }
-            } else {
-                self.drw.setscheme(&self.scheme[SCHEME_NORM]);
-                self.drw.rect(x, 0, w as u32, bh as u32, true, true);
-            }
+            /* notitle: no window title, just clear the rest of the bar */
+            self.drw.setscheme(&self.scheme[SCHEME_NORM]);
+            self.drw.rect(x, 0, w as u32, bh as u32, true, true);
         }
         self.drw.map(self.mons[m].barwin, 0, 0, self.mons[m].ww as u32, bh as u32);
     }
@@ -1561,11 +1554,7 @@ impl Dwm {
                 _ => {}
             }
             if ev.atom == XA_WM_NAME || ev.atom == self.netatom[NET_WM_NAME] {
-                self.updatetitle(c);
-                let m = self.clients[c].mon;
-                if Some(c) == self.mons[m].sel {
-                    self.drawbar(m);
-                }
+                self.updatetitle(c); /* notitle: the bar does not show it */
             }
             if ev.atom == self.netatom[NET_WM_WINDOW_TYPE] {
                 self.updatewindowtype(c);
