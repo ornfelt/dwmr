@@ -4,8 +4,9 @@
 
 dwmr is a port of [dwm](https://dwm.suckless.org) (6.8) to Rust. It is a
 function-for-function replica of dwm.c/drw.c with the same behaviour, the
-same tiled, monocle and floating layouts, the same tags, bar, key and mouse
-bindings, plus one addition: the configuration is read from a file at
+same monocle and floating layouts, the same tags, bar, key and mouse
+bindings, plus the gap-aware tiled layouts of dwm's vanitygaps patch and one
+addition: the configuration is read from a file at
 startup instead of being compiled in.
 
 ## Requirements
@@ -51,8 +52,10 @@ A few notes on the format:
 - Functions: spawn, togglebar, focusstack, pushstack, incnmaster, setmfact,
   zoom, view, killclient, setlayout, togglefloating, togglefullscr,
   togglesticky, togglescratch, tag, focusmon, tagmon, toggleview, toggletag,
-  shifttag, shiftview, shiftviewclients, quit, movemouse, resizemouse.
-  Layouts: tile, monocle, none.
+  shifttag, shiftview, shiftviewclients, defaultgaps, incrgaps, togglegaps,
+  togglebgaps, quit, movemouse, resizemouse.
+  Layouts: spiral, tile, bstack, dwindle, deck, monocle, centeredmaster,
+  centeredfloatingmaster, none.
 - `scratchpads` is a list of `{ name, cmd }` (dwm's scratchpads patch). Each
   scratchpad owns a tag bit above the normal tags, written `"SPTAG(0)"`,
   `"SPTAG(1)"`, ... in a rule's `tags`; the tags and the scratchpads together
@@ -75,6 +78,19 @@ A few notes on the format:
 - `arg = { v = "termcmd" }` refers to an entry of `commands`;
   `arg = { v = "layouts[2]" }` to an entry of `layouts`. In `dmenucmd` the
   argument after `-m` is replaced with the selected monitor (dwm's dmenumon).
+- The tiled layouts (spiral, tile, bstack, dwindle, deck, centeredmaster,
+  centeredfloatingmaster) leave gaps between windows (`gappih`, `gappiv`) and
+  at the screen edge (`gappoh`, `gappov`), 20 pixels each by default, at most
+  1000 (dwm's vanitygaps patch, without cfacts: windows in an area share it
+  evenly). `smartgaps = true` drops the outer gaps for a single window. A
+  single Firefox window (class starting with "firefox", any case) gets no
+  outer gaps unless `browsergaps = true`. `incrgaps` with `{ i = n }` changes
+  all gaps of the selected monitor by `n`, `defaultgaps` resets them,
+  `togglegaps` turns gaps off and on and `togglebgaps` toggles `browsergaps`.
+  Bound to Mod1-plus/minus (3 px), Mod1-Shift-plus/minus (1 px), Mod1-x,
+  Mod1-z and Mod1-Control-z, and Mod1-Button2/4/5 on a window (defaultgaps,
+  +1, -1), which replaces dwm's Mod1-Button2 togglefloating. The default
+  layout is spiral; Mod1-t/f/m still select tile, floating and monocle.
 - Setting only `modkey` rebinds the default keys and buttons to it.
 - The bar shows no window title and has no title click area (dwm's notitle
   patch); `ClkWinTitle` is not a valid click.

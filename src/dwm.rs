@@ -48,6 +48,11 @@ use crate::drw::{Clr, Cur, Drw, COL_BORDER};
 use crate::util::{die, truncate_utf8};
 use crate::VERSION;
 
+/* vanitygaps.c is #included by dwm's config.h; here it is a child module,
+ * so its layouts and actions are methods of Dwm like everything else */
+#[path = "vanitygaps.rs"]
+pub mod vanitygaps;
+
 /* macros */
 const BUTTONMASK: c_long = ButtonPressMask | ButtonReleaseMask;
 const MOUSEMASK: c_long = BUTTONMASK | PointerMotionMask;
@@ -180,6 +185,7 @@ pub struct Client {
     pub oldstate: bool,
     pub isfullscreen: bool,
     pub issticky: bool,
+    pub isbrowser: bool,
     pub next: Option<ClientId>,
     pub snext: Option<ClientId>,
     pub mon: MonId,
@@ -201,6 +207,10 @@ pub struct Monitor {
     pub wy: i32,
     pub ww: i32,
     pub wh: i32, /* window area  */
+    pub gappih: i32, /* horizontal gap between windows */
+    pub gappiv: i32, /* vertical gap between windows */
+    pub gappoh: i32, /* horizontal outer gaps */
+    pub gappov: i32, /* vertical outer gaps */
     pub seltags: usize,
     pub sellt: usize,
     pub tagset: [u32; 2],
@@ -247,6 +257,11 @@ pub struct Dwm {
     /// Client slab plus its free list.
     clients: Vec<Client>,
     free_clients: Vec<ClientId>,
+    /* vanitygaps */
+    enablegaps: bool,
+    /// Outer gaps for a lone browser window; toggled by togglebgaps, hence
+    /// not read from the (immutable) config after startup.
+    browsergaps: bool,
 }
 
 /// The event handler table (`handler[LASTEvent]`).
@@ -288,6 +303,7 @@ impl Dwm {
         let drw = Drw::create(dpy, screen, root, sw.max(1) as u32, sh.max(1) as u32);
         Dwm {
             layouts: config.layouts.clone(),
+            browsergaps: config.browsergaps,
             config: Rc::new(config),
             stext: String::new(),
             screen,
@@ -309,6 +325,7 @@ impl Dwm {
             wmcheckwin: 0,
             clients: Vec::new(),
             free_clients: Vec::new(),
+            enablegaps: true,
         }
     }
 
@@ -425,6 +442,9 @@ impl Dwm {
             }
             (class, instance)
         };
+
+        /* firefox, Firefox, firefox-esr, ... (used by getgaps) */
+        self.clients[c].isbrowser = class.as_bytes().get(..7).is_some_and(|p| p.eq_ignore_ascii_case(b"firefox"));
 
         let sptagmask = self.sptagmask();
         for r in &config.rules {
@@ -863,6 +883,10 @@ impl Dwm {
             nmaster: config.nmaster,
             showbar: config.showbar,
             topbar: config.topbar,
+            gappih: config.gappih as i32,
+            gappiv: config.gappiv as i32,
+            gappoh: config.gappoh as i32,
+            gappov: config.gappov as i32,
             lt: [0, 1 % self.layouts.len()],
             ltsymbol,
             ..Default::default()
@@ -2430,51 +2454,6 @@ impl Dwm {
         }
         let m = self.dirtomon(arg.i());
         self.sendmon(sel, m);
-    }
-
-    pub fn tile(&mut self, m: MonId) {
-        let mut n = 0;
-
-        let mut c = self.nexttiled(self.mons[m].clients);
-        while let Some(i) = c {
-            n += 1;
-            c = self.nexttiled(self.clients[i].next);
-        }
-        if n == 0 {
-            return;
-        }
-
-        let (wx, wy, ww, wh, nmaster, mfact) =
-            (self.mons[m].wx, self.mons[m].wy, self.mons[m].ww, self.mons[m].wh, self.mons[m].nmaster, self.mons[m].mfact);
-        let mw = if n > nmaster {
-            if nmaster != 0 {
-                (ww as f32 * mfact) as i32
-            } else {
-                0
-            }
-        } else {
-            ww
-        };
-        let (mut i, mut my, mut ty) = (0, 0, 0);
-        let mut c = self.nexttiled(self.mons[m].clients);
-        while let Some(k) = c {
-            let bw = self.clients[k].bw;
-            if i < nmaster {
-                let h = (wh - my) / (n.min(nmaster) - i);
-                self.resize(k, wx, wy + my, mw - (2 * bw), h - (2 * bw), false);
-                if my + height(&self.clients[k]) < wh {
-                    my += height(&self.clients[k]);
-                }
-            } else {
-                let h = (wh - ty) / (n - i);
-                self.resize(k, wx + mw, wy + ty, ww - mw - (2 * bw), h - (2 * bw), false);
-                if ty + height(&self.clients[k]) < wh {
-                    ty += height(&self.clients[k]);
-                }
-            }
-            c = self.nexttiled(self.clients[k].next);
-            i += 1;
-        }
     }
 
     pub fn togglebar(&mut self, _arg: &Arg) {

@@ -12,6 +12,12 @@
 
 # appearance
 borderpx = 1          # border pixel of windows
+gappih = 20           # horiz inner gap between windows
+gappiv = 20           # vert inner gap between windows
+gappoh = 20           # horiz outer gap between windows and screen edge
+gappov = 20           # vert outer gap between windows and screen edge
+smartgaps = false     # true means no outer gap when there is only one window
+browsergaps = false   # false means no outer gap when there is only one window and it is firefox
 snap = 32             # snap pixel
 showbar = true        # false means no bar
 topbar = true         # false means bottom bar
@@ -54,9 +60,15 @@ refreshrate = 120     # refresh rate (per second) for client move/resize
 
 layouts = [
 	#  symbol          arrange function
-	{ symbol = "[]=",  arrange = "tile" },     # first entry is default
-	{ symbol = "><>",  arrange = "none" },     # no layout function means floating behavior
+	{ symbol = "[@]",  arrange = "spiral" },   # first entry is default
+	{ symbol = "[]=",  arrange = "tile" },
+	{ symbol = "TTT",  arrange = "bstack" },
+	{ symbol = "[\\]", arrange = "dwindle" },
+	{ symbol = "[D]",  arrange = "deck" },
 	{ symbol = "[M]",  arrange = "monocle" },
+	{ symbol = "|M|",  arrange = "centeredmaster" },
+	{ symbol = ">M>",  arrange = "centeredfloatingmaster" },
+	{ symbol = "><>",  arrange = "none" },     # no layout function means floating behavior
 ]
 
 # key definitions
@@ -87,13 +99,20 @@ keys = [
 	{ mod = "MODKEY",                   key = "d",        func = "incnmaster",      arg = { i = -1 } },
 	{ mod = "MODKEY",                   key = "h",        func = "setmfact",        arg = { f = -0.05 } },
 	{ mod = "MODKEY",                   key = "l",        func = "setmfact",        arg = { f = 0.05 } },
+	{ mod = "MODKEY",                   key = "x",        func = "defaultgaps" },
+	{ mod = "MODKEY",                   key = "z",        func = "togglegaps" },
+	{ mod = "MODKEY|ControlMask",       key = "z",        func = "togglebgaps" },
+	{ mod = "MODKEY",                   key = "plus",     func = "incrgaps",        arg = { i = 3 } },
+	{ mod = "MODKEY",                   key = "minus",    func = "incrgaps",        arg = { i = -3 } },
+	{ mod = "MODKEY|ShiftMask",         key = "plus",     func = "incrgaps",        arg = { i = 1 } },
+	{ mod = "MODKEY|ShiftMask",         key = "minus",    func = "incrgaps",        arg = { i = -1 } },
 	{ mod = "MODKEY",                   key = "Return",   func = "zoom" },
 	{ mod = "MODKEY",                   key = "Tab",      func = "shiftviewclients", arg = { i = 1 } },
 	{ mod = "MODKEY|ShiftMask",         key = "Tab",      func = "shiftviewclients", arg = { i = -1 } },
 	{ mod = "MODKEY|ShiftMask",         key = "c",        func = "killclient" },
-	{ mod = "MODKEY",                   key = "t",        func = "setlayout",       arg = { v = "layouts[0]" } },
-	{ mod = "MODKEY",                   key = "f",        func = "setlayout",       arg = { v = "layouts[1]" } },
-	{ mod = "MODKEY",                   key = "m",        func = "setlayout",       arg = { v = "layouts[2]" } },
+	{ mod = "MODKEY",                   key = "t",        func = "setlayout",       arg = { v = "layouts[1]" } },
+	{ mod = "MODKEY",                   key = "f",        func = "setlayout",       arg = { v = "layouts[8]" } },
+	{ mod = "MODKEY",                   key = "m",        func = "setlayout",       arg = { v = "layouts[5]" } },
 	{ mod = "MODKEY",                   key = "space",    func = "setlayout" },
 	{ mod = "MODKEY|ShiftMask",         key = "space",    func = "togglefloating" },
 	{ mod = "MODKEY|ShiftMask",         key = "f",        func = "togglefullscr" },
@@ -127,11 +146,13 @@ keys = [
 buttons = [
 	#  click                    event mask         button               function                  argument
 	{ click = "ClkLtSymbol",    mask = "0",        button = "Button1",  func = "setlayout" },
-	{ click = "ClkLtSymbol",    mask = "0",        button = "Button3",  func = "setlayout",       arg = { v = "layouts[2]" } },
+	{ click = "ClkLtSymbol",    mask = "0",        button = "Button3",  func = "setlayout",       arg = { v = "layouts[5]" } },
 	{ click = "ClkStatusText",  mask = "0",        button = "Button2",  func = "spawn",           arg = { v = "termcmd" } },
 	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button1",  func = "movemouse" },
-	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button2",  func = "togglefloating" },
+	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button2",  func = "defaultgaps" },
 	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button3",  func = "resizemouse" },
+	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button4",  func = "incrgaps",        arg = { i = 1 } },
+	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button5",  func = "incrgaps",        arg = { i = -1 } },
 	{ click = "ClkTagBar",      mask = "0",        button = "Button1",  func = "view" },
 	{ click = "ClkTagBar",      mask = "0",        button = "Button3",  func = "toggleview" },
 	{ click = "ClkTagBar",      mask = "MODKEY",   button = "Button1",  func = "tag" },

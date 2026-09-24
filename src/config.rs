@@ -17,6 +17,7 @@ use serde::Deserialize;
 use x11::keysym::*;
 use x11::xlib::{self, KeySym, XStringToKeysym};
 
+use crate::dwm::vanitygaps::GAP_MAX;
 use crate::dwm::{inc, Dwm, MonId};
 
 /* enums */
@@ -129,6 +130,12 @@ pub struct Rule {
 pub struct Config {
     /* appearance */
     pub borderpx: u32, /* border pixel of windows */
+    pub gappih: u32,   /* horiz inner gap between windows */
+    pub gappiv: u32,   /* vert inner gap between windows */
+    pub gappoh: u32,   /* horiz outer gap between windows and screen edge */
+    pub gappov: u32,   /* vert outer gap between windows and screen edge */
+    pub smartgaps: bool, /* true means no outer gap when there is only one window */
+    pub browsergaps: bool, /* false means no outer gap when there is only one window and it is firefox */
     pub snap: u32,     /* snap pixel */
     pub showbar: bool, /* false means no bar */
     pub topbar: bool,  /* false means bottom bar */
@@ -212,9 +219,15 @@ impl Default for Config {
         /* layout(s) */
         let layouts = vec![
             /* symbol     arrange function */
-            Layout { symbol: "[]=".into(), arrange: Some(Dwm::tile) }, /* first entry is default */
-            Layout { symbol: "><>".into(), arrange: None },            /* no layout function means floating behavior */
+            Layout { symbol: "[@]".into(), arrange: Some(Dwm::spiral) }, /* first entry is default */
+            Layout { symbol: "[]=".into(), arrange: Some(Dwm::tile) },
+            Layout { symbol: "TTT".into(), arrange: Some(Dwm::bstack) },
+            Layout { symbol: "[\\]".into(), arrange: Some(Dwm::dwindle) },
+            Layout { symbol: "[D]".into(), arrange: Some(Dwm::deck) },
             Layout { symbol: "[M]".into(), arrange: Some(Dwm::monocle) },
+            Layout { symbol: "|M|".into(), arrange: Some(Dwm::centeredmaster) },
+            Layout { symbol: ">M>".into(), arrange: Some(Dwm::centeredfloatingmaster) },
+            Layout { symbol: "><>".into(), arrange: None }, /* no layout function means floating behavior */
         ];
 
         /* key definitions */
@@ -248,13 +261,20 @@ impl Default for Config {
             k(modkey, XK_d, Dwm::incnmaster, Arg::I(-1)),
             k(modkey, XK_h, Dwm::setmfact, Arg::F(-0.05)),
             k(modkey, XK_l, Dwm::setmfact, Arg::F(0.05)),
+            k(modkey, XK_x, Dwm::defaultgaps, Arg::None),
+            k(modkey, XK_z, Dwm::togglegaps, Arg::None),
+            k(modkey | xlib::ControlMask, XK_z, Dwm::togglebgaps, Arg::None),
+            k(modkey, XK_plus, Dwm::incrgaps, Arg::I(3)),
+            k(modkey, XK_minus, Dwm::incrgaps, Arg::I(-3)),
+            k(modkey | xlib::ShiftMask, XK_plus, Dwm::incrgaps, Arg::I(1)),
+            k(modkey | xlib::ShiftMask, XK_minus, Dwm::incrgaps, Arg::I(-1)),
             k(modkey, XK_Return, Dwm::zoom, Arg::None),
             k(modkey, XK_Tab, Dwm::shiftviewclients, Arg::I(1)),
             k(modkey | xlib::ShiftMask, XK_Tab, Dwm::shiftviewclients, Arg::I(-1)),
             k(modkey | xlib::ShiftMask, XK_c, Dwm::killclient, Arg::None),
-            k(modkey, XK_t, Dwm::setlayout, Arg::Layout(0)),
-            k(modkey, XK_f, Dwm::setlayout, Arg::Layout(1)),
-            k(modkey, XK_m, Dwm::setlayout, Arg::Layout(2)),
+            k(modkey, XK_t, Dwm::setlayout, Arg::Layout(1)),
+            k(modkey, XK_f, Dwm::setlayout, Arg::Layout(8)),
+            k(modkey, XK_m, Dwm::setlayout, Arg::Layout(5)),
             k(modkey, XK_space, Dwm::setlayout, Arg::None),
             k(modkey | xlib::ShiftMask, XK_space, Dwm::togglefloating, Arg::None),
             k(modkey | xlib::ShiftMask, XK_f, Dwm::togglefullscr, Arg::None),
@@ -281,11 +301,13 @@ impl Default for Config {
         let buttons = vec![
             /* click                event mask      button          function        argument */
             b(CLK_LT_SYMBOL, 0, xlib::Button1, Dwm::setlayout, Arg::None),
-            b(CLK_LT_SYMBOL, 0, xlib::Button3, Dwm::setlayout, Arg::Layout(2)),
+            b(CLK_LT_SYMBOL, 0, xlib::Button3, Dwm::setlayout, Arg::Layout(5)),
             b(CLK_STATUS_TEXT, 0, xlib::Button2, Dwm::spawn, Arg::V(termcmd.clone())),
             b(CLK_CLIENT_WIN, modkey, xlib::Button1, Dwm::movemouse, Arg::None),
-            b(CLK_CLIENT_WIN, modkey, xlib::Button2, Dwm::togglefloating, Arg::None),
+            b(CLK_CLIENT_WIN, modkey, xlib::Button2, Dwm::defaultgaps, Arg::None),
             b(CLK_CLIENT_WIN, modkey, xlib::Button3, Dwm::resizemouse, Arg::None),
+            b(CLK_CLIENT_WIN, modkey, xlib::Button4, Dwm::incrgaps, Arg::I(1)),
+            b(CLK_CLIENT_WIN, modkey, xlib::Button5, Dwm::incrgaps, Arg::I(-1)),
             b(CLK_TAG_BAR, 0, xlib::Button1, Dwm::view, Arg::None),
             b(CLK_TAG_BAR, 0, xlib::Button3, Dwm::toggleview, Arg::None),
             b(CLK_TAG_BAR, modkey, xlib::Button1, Dwm::tag, Arg::None),
@@ -296,6 +318,12 @@ impl Default for Config {
 
         Config {
             borderpx: 1,
+            gappih: 20,
+            gappiv: 20,
+            gappoh: 20,
+            gappov: 20,
+            smartgaps: false,
+            browsergaps: false,
             snap: 32,
             showbar: true,
             topbar: true,
@@ -378,6 +406,12 @@ fn err<T>(msg: impl Into<String>) -> Result<T, ConfigError> {
 struct RawConfig {
     /* appearance */
     borderpx: Option<u32>,
+    gappih: Option<u32>,
+    gappiv: Option<u32>,
+    gappoh: Option<u32>,
+    gappov: Option<u32>,
+    smartgaps: Option<bool>,
+    browsergaps: Option<bool>,
     snap: Option<u32>,
     showbar: Option<bool>,
     topbar: Option<bool>,
@@ -626,9 +660,11 @@ fn parse_keysym(s: &str) -> Result<KeySym, ConfigError> {
 
 fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
     Ok(match name.trim() {
+        "defaultgaps" => Dwm::defaultgaps,
         "focusmon" => Dwm::focusmon,
         "focusstack" => Dwm::focusstack,
         "incnmaster" => Dwm::incnmaster,
+        "incrgaps" => Dwm::incrgaps,
         "killclient" => Dwm::killclient,
         "movemouse" => Dwm::movemouse,
         "pushstack" => Dwm::pushstack,
@@ -643,8 +679,10 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "tag" => Dwm::tag,
         "tagmon" => Dwm::tagmon,
         "togglebar" => Dwm::togglebar,
+        "togglebgaps" => Dwm::togglebgaps,
         "togglefloating" => Dwm::togglefloating,
         "togglefullscr" => Dwm::togglefullscr,
+        "togglegaps" => Dwm::togglegaps,
         "togglescratch" => Dwm::togglescratch,
         "togglesticky" => Dwm::togglesticky,
         "toggletag" => Dwm::toggletag,
@@ -660,6 +698,12 @@ fn parse_arrange(name: Option<&str>) -> Result<Option<ArrangeFn>, ConfigError> {
         None | Some("") | Some("none") | Some("NULL") => None,
         Some("tile") => Some(Dwm::tile),
         Some("monocle") => Some(Dwm::monocle),
+        Some("bstack") => Some(Dwm::bstack),
+        Some("centeredmaster") => Some(Dwm::centeredmaster),
+        Some("centeredfloatingmaster") => Some(Dwm::centeredfloatingmaster),
+        Some("deck") => Some(Dwm::deck),
+        Some("dwindle") => Some(Dwm::dwindle),
+        Some("spiral") => Some(Dwm::spiral),
         Some(other) => return err(format!("unknown layout function '{}'", other)),
     })
 }
@@ -727,6 +771,25 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
     /* appearance */
     if let Some(v) = raw.borderpx {
         config.borderpx = v;
+    }
+    for (name, v, gap) in [
+        ("gappih", raw.gappih, &mut config.gappih),
+        ("gappiv", raw.gappiv, &mut config.gappiv),
+        ("gappoh", raw.gappoh, &mut config.gappoh),
+        ("gappov", raw.gappov, &mut config.gappov),
+    ] {
+        if let Some(v) = v {
+            if v > GAP_MAX as u32 {
+                return err(format!("{} must be at most {}", name, GAP_MAX));
+            }
+            *gap = v;
+        }
+    }
+    if let Some(v) = raw.smartgaps {
+        config.smartgaps = v;
+    }
+    if let Some(v) = raw.browsergaps {
+        config.browsergaps = v;
     }
     if let Some(v) = raw.snap {
         config.snap = v;
@@ -971,6 +1034,8 @@ mod tests {
         let c = parse(DEFAULT_TOML).expect("config/config.toml parses");
         let d = Config::default();
         assert_eq!(c.borderpx, d.borderpx);
+        assert_eq!((c.gappih, c.gappiv, c.gappoh, c.gappov), (d.gappih, d.gappiv, d.gappoh, d.gappov));
+        assert_eq!((c.smartgaps, c.browsergaps), (d.smartgaps, d.browsergaps));
         assert_eq!(c.snap, d.snap);
         assert_eq!(c.showbar, d.showbar);
         assert_eq!(c.topbar, d.topbar);
@@ -1000,6 +1065,8 @@ mod tests {
         assert!(parse("refreshrate = 0").is_err());
         assert!(parse("layouts = []").is_err());
         assert!(parse("tags = []").is_err());
+        assert!(parse("gappih = 1001").is_err());
+        assert!(parse("layouts = [ { symbol = \"x\", arrange = \"fibonacci\" } ]").is_err());
         assert!(parse("nonsense = 1").is_err());
         assert!(parse("keys = [ { mod = \"MODKEY\", key = \"p\", func = \"spawn\", arg = { v = \"nope\" } } ]").is_err());
         assert!(parse("keys = [ { tagkeys = \"1\", tag = 40 } ]").is_err());

@@ -5,8 +5,9 @@ dwmr \- dynamic window manager (Rust port of dwm)
 .B dwmr
 .RB [ \-v ]
 .SH DESCRIPTION
-dwmr is a dynamic window manager for X, a port of dwm to Rust with the same behaviour. It manages windows in tiled, monocle
-and floating layouts. Either layout can be applied dynamically, optimising the
+dwmr is a dynamic window manager for X, a port of dwm to Rust with the same behaviour. It manages windows in tiled (spiral, tile,
+bottom stack, dwindle, deck, centered master and centered floating master),
+monocle and floating layouts. Either layout can be applied dynamically, optimising the
 environment for the application in use and the task performed.
 .P
 In tiled layouts windows are managed in a master and stacking area. The master
@@ -16,6 +17,15 @@ adjusted from zero to an arbitrary number. In monocle layout all windows are
 maximised to the screen size. In floating layout windows can be resized and
 moved freely. Dialog windows are always managed floating, regardless of the
 layout applied.
+.P
+The tiled layouts leave gaps between the windows and between the windows and
+the screen edge (vanitygaps). The default layout is the Fibonacci spiral.
+When the only tiled window on a screen is Firefox (its class starts with
+\(lqfirefox\(rq, in any case), it gets no outer gaps unless
+.B browsergaps
+is enabled; with
+.B smartgaps = true
+no single window gets outer gaps.
 .P
 Windows are grouped by tags. Each window can be tagged with one or multiple
 tags. Selecting certain tags displays all windows with these tags.
@@ -51,7 +61,7 @@ command.
 .TP
 .B Button1
 click on a tag label to display all windows with that tag, click on the layout
-label toggles between tiled and floating layout.
+label toggles between the current and the previous layout.
 .TP
 .B Button3
 click on a tag label adds/removes all windows with that tag to/from the view.
@@ -146,6 +156,21 @@ Increase master area size.
 .B Mod1\-h
 Decrease master area size.
 .TP
+.B Mod1\-x
+Reset the gaps of the focused screen to the configured ones (vanitygaps).
+.TP
+.B Mod1\-z
+Toggle the gaps on and off.
+.TP
+.B Mod1\-Control\-z
+Toggle the outer gaps of a lone Firefox window (browsergaps).
+.TP
+.B Mod1\-plus / Mod1\-minus
+Increase/decrease all gaps of the focused screen by 3 pixels.
+.TP
+.B Mod1\-Shift\-plus / Mod1\-Shift\-minus
+Increase/decrease all gaps of the focused screen by 1 pixel.
+.TP
 .B Mod1\-Return
 Zooms/cycles focused window to/from master area (tiled layouts only).
 .TP
@@ -205,10 +230,13 @@ Quit dwmr.
 Move focused window while dragging. Tiled windows will be toggled to the floating state.
 .TP
 .B Mod1\-Button2
-Toggles focused window between floating and tiled state.
+Reset the gaps to the configured ones (vanitygaps).
 .TP
 .B Mod1\-Button3
 Resize focused window while dragging. Tiled windows will be toggled to the floating state.
+.TP
+.B Mod1\-Button4 / Mod1\-Button5
+Increase/decrease all gaps by 1 pixel.
 .SH CUSTOMIZATION
 dwmr is customized through ~/.config/dwmr/config.toml (see CONFIGURATION below); it
 also builds in the same defaults as dwm, so the file is optional.
