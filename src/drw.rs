@@ -7,6 +7,7 @@
 //! fallback fonts found through fontconfig are appended at the end.
 
 use std::ffi::CString;
+use std::mem;
 use std::os::raw::{c_int, c_uint};
 use std::ptr;
 
@@ -77,6 +78,8 @@ pub const COL_FG: usize = 0;
 pub const COL_BG: usize = 1;
 pub const COL_BORDER: usize = 2;
 pub type Clr = XftColor;
+/// A `Clr` that was never allocated (all zero), the value before setup().
+pub const CLR_NONE: Clr = Clr { pixel: 0, color: XRenderColor { red: 0, green: 0, blue: 0, alpha: 0 } };
 
 pub struct Drw {
     pub w: u32,
@@ -149,7 +152,7 @@ impl Drw {
                 self.gc = ptr::null_mut();
             }
         }
-        self.fontset_free();
+        Self::fontset_free(&mut self.fonts);
     }
 
     /* This function is an implementation detail. Library users should use
@@ -211,7 +214,9 @@ impl Drw {
     }
 
     /* Fnt abstraction */
-    /// Load `fonts` in order, skipping the ones that fail. Returns whether at
+    /// Load `fonts` in order, skipping the ones that fail, and make them the
+    /// current font set (the previous one is not freed, as in dwm; take it
+    /// out with [`Drw::setfontset`] first to keep it). Returns whether at
     /// least one font was loaded.
     pub fn fontset_create(&mut self, fonts: &[String]) -> bool {
         let mut ret = Vec::with_capacity(fonts.len());
@@ -224,8 +229,9 @@ impl Drw {
         !self.fonts.is_empty()
     }
 
-    pub fn fontset_free(&mut self) {
-        for font in self.fonts.drain(..) {
+    /// Free a font set (`drw_fontset_free(Fnt *)`), leaving it empty.
+    pub fn fontset_free(set: &mut Vec<Fnt>) {
+        for font in set.drain(..) {
             Self::xfont_free(font);
         }
     }
@@ -243,10 +249,17 @@ impl Drw {
 
     /* Colorscheme abstraction */
     pub fn clr_create(&self, clrname: &str) -> Clr {
-        let Ok(cname) = CString::new(clrname) else {
-            die(&format!("error, cannot allocate color '{}'", clrname));
-        };
-        let mut dest = Clr { pixel: 0, color: XRenderColor { red: 0, green: 0, blue: 0, alpha: 0 } };
+        match self.clr_alloc(clrname) {
+            Some(clr) => clr,
+            None => die(&format!("error, cannot allocate color '{}'", clrname)),
+        }
+    }
+
+    /// `drw_clr_create` without the die(): `None` when the color cannot be
+    /// allocated, for color names that come from the status text at runtime.
+    pub fn clr_alloc(&self, clrname: &str) -> Option<Clr> {
+        let cname = CString::new(clrname).ok()?;
+        let mut dest = CLR_NONE;
         // SAFETY: valid display/visual/colormap and a NUL terminated name.
         let ok = unsafe {
             XftColorAllocName(
@@ -257,10 +270,7 @@ impl Drw {
                 &mut dest,
             )
         };
-        if ok == 0 {
-            die(&format!("error, cannot allocate color '{}'", clrname));
-        }
-        dest
+        (ok != 0).then_some(dest)
     }
 
     /// Create a color scheme. Needs at least two colors; returns an empty
@@ -302,10 +312,11 @@ impl Drw {
     }
 
     /* Drawing context manipulation */
-    #[allow(dead_code)]
-    pub fn setfontset(&mut self, set: Vec<Fnt>) {
-        self.fontset_free();
-        self.fonts = set;
+    /// Make `set` the current font set. dwm only repoints `drw->fonts`; here
+    /// the sets are swapped, so `set` holds the previous one afterwards and
+    /// the caller keeps ownership of both.
+    pub fn setfontset(&mut self, set: &mut Vec<Fnt>) {
+        mem::swap(&mut self.fonts, set);
     }
 
     /// Select the color scheme used by `rect` and `text` (the colors are
@@ -313,6 +324,14 @@ impl Drw {
     pub fn setscheme(&mut self, scm: &[Clr]) {
         self.scheme.clear();
         self.scheme.extend_from_slice(scm);
+    }
+
+    /// `drw->scheme[ColFg] = clr`: change the foreground of the current
+    /// scheme. Only the copy made by [`Drw::setscheme`] changes.
+    pub fn setfg(&mut self, clr: Clr) {
+        if let Some(fg) = self.scheme.get_mut(COL_FG) {
+            *fg = clr;
+        }
     }
 
     /* Drawing functions */

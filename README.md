@@ -75,6 +75,15 @@ A few notes on the format:
   window, ignoring windows on scratchpad tags. Bound by default to
   Mod1-Shift-y/o, the mouse wheel on the tag bar and Mod1-(Shift-)Tab; the
   latter replaces dwm's Mod1-Tab "view previous tags".
+- The status text (the root window name, up to 1023 bytes) is shown on every
+  monitor and may contain dwm's status2d colour codes, `^...^`, which are
+  not drawn: the text starts in `statuscolors.col1`; `^3^`..`^6^` switch to
+  `col3`..`col6`, `^c#rrggbb^` to any colour and `^2^` to the weather colour
+  chosen from the temperature after it (+20 and above `col21`, below +20
+  `col22`, negative `col23`, no sign `col24`). `^B^` switches to the bigger
+  `statusbigfonts` (`[]` for none) until `^N^`, e.g. for a block's icon.
+  Other codes (`^r`, `^b`, `^d`, `^f`) are ignored; an unterminated `^` ends
+  the text.
 - `arg = { v = "termcmd" }` refers to an entry of `commands`;
   `arg = { v = "layouts[2]" }` to an entry of `layouts`. In `dmenucmd` the
   argument after `-m` is replaced with the selected monitor (dwm's dmenumon).

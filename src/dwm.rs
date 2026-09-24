@@ -47,8 +47,8 @@ use crate::config::{
     Arg, ArrangeFn, Config, Layout, CLK_CLIENT_WIN, CLK_LT_SYMBOL, CLK_ROOT_WIN, CLK_STATUS_TEXT, CLK_TAG_BAR,
     SCHEME_NORM, SCHEME_SEL,
 };
-use crate::drw::{Clr, Cur, Drw, COL_BORDER};
-use crate::util::{die, truncate_utf8};
+use crate::drw::{Clr, Cur, Drw, Fnt, CLR_NONE, COL_BORDER};
+use crate::util::{atoi, die, truncate_utf8};
 use crate::xres::{XResClientIdSpec, XResClientIdValue, XResClientIdsDestroy, XResGetClientPid, XResQueryClientIds, XResQueryExtension, XRES_CLIENT_ID_PID_MASK};
 use crate::VERSION;
 
@@ -144,8 +144,15 @@ const NORMAL_STATE: c_long = 1;
 const ICONIC_STATE: c_long = 3;
 
 /* fixed buffer sizes from dwm.c, applied as byte limits */
-const NAME_SIZE: usize = 256; /* Client.name, stext */
+const NAME_SIZE: usize = 256; /* Client.name */
+const STEXT_SIZE: usize = 1024; /* stext (status2d) */
 const LTSYMBOL_SIZE: usize = 16; /* Monitor.ltsymbol */
+/// `scheme[LENGTH(colors)]`: the scheme the status text is drawn with, whose
+/// fg its color codes change (status2d). `colors` holds SchemeNorm and
+/// SchemeSel, so this is the index right after them.
+const SCHEME_STATUS: usize = SCHEME_SEL + 1;
+/// How many ^c#rrggbb^ status colors are kept allocated before starting over.
+const STATUSCLRS: usize = 64;
 
 /// Index of a client in `Dwm::clients`.
 pub type ClientId = usize;
@@ -240,17 +247,55 @@ type XErrorHandler = Option<unsafe extern "C" fn(*mut Display, *mut XErrorEvent)
 /// The Xlib error handler that was installed before ours (`xerrorxlib`).
 static XERRORXLIB: OnceLock<XErrorHandler> = OnceLock::new();
 
+/// The colors of the status text codes (`StatusColors`), allocated once in
+/// setup(); dwm's drawstatusbar() allocates one at every code on every redraw.
+#[derive(Clone, Copy)]
+struct StatusClr {
+    col1: Clr,
+    col21: Clr,
+    col22: Clr,
+    col23: Clr,
+    col24: Clr,
+    col3: Clr,
+    col4: Clr,
+    col5: Clr,
+    col6: Clr,
+}
+
+impl StatusClr {
+    const NONE: StatusClr = StatusClr {
+        col1: CLR_NONE,
+        col21: CLR_NONE,
+        col22: CLR_NONE,
+        col23: CLR_NONE,
+        col24: CLR_NONE,
+        col3: CLR_NONE,
+        col4: CLR_NONE,
+        col5: CLR_NONE,
+        col6: CLR_NONE,
+    };
+}
+
 /// All of dwm's global state.
 pub struct Dwm {
     config: Rc<Config>,
     /// The layouts; `cleanup()` appends an empty one, hence a copy of `config.layouts`.
     layouts: Vec<Layout>,
     stext: String,
+    statusw: i32, /* width of the status text, set by drawbar() */
     screen: c_int,
     sw: i32,
     sh: i32, /* X display screen geometry width, height */
     bh: i32, /* bar height */
     lrpad: i32, /* sum of left and right padding for text */
+    /* status2d fonts: drw holds the current font set, this the other one:
+     * the big font (statusbigfonts) while the normal font is current and the
+     * normal font while ^B^ is in effect; empty when no big font loaded */
+    statusbigfont: Vec<Fnt>,
+    bigfont: bool, /* the big font is the current one */
+    statusclr: StatusClr,
+    /// The ^c#rrggbb^ colors seen so far, by rgb value (at most STATUSCLRS).
+    statusclrs: Vec<(u32, Clr)>,
     numlockmask: u32,
     wmatom: [Atom; WM_LAST],
     netatom: [Atom; NET_LAST],
@@ -315,11 +360,16 @@ impl Dwm {
             browsergaps: config.browsergaps,
             config: Rc::new(config),
             stext: String::new(),
+            statusw: 0,
             screen,
             sw,
             sh,
             bh: 0,
             lrpad: 0,
+            statusbigfont: Vec::new(),
+            bigfont: false,
+            statusclr: StatusClr::NONE,
+            statusclrs: Vec::new(),
             numlockmask: 0,
             wmatom: [0; WM_LAST],
             netatom: [0; NET_LAST],
@@ -718,7 +768,7 @@ impl Dwm {
                 arg = Arg::Ui(1 << i);
             } else if ev.x < x + Self::textw(&mut self.drw, self.lrpad, &self.mons[self.selmon].ltsymbol) {
                 click = CLK_LT_SYMBOL;
-            } else if ev.x > self.mons[self.selmon].ww - Self::textw(&mut self.drw, self.lrpad, &self.stext) + self.lrpad - 2 {
+            } else if ev.x > self.mons[self.selmon].ww - self.statusw {
                 click = CLK_STATUS_TEXT;
             }
             /* notitle: the space between the layout symbol and the status is
@@ -779,8 +829,28 @@ impl Dwm {
             self.drw.scm_free(scm);
         }
         self.scheme.clear();
+        let sc = &mut self.statusclr;
+        for clr in [
+            &mut sc.col1,
+            &mut sc.col21,
+            &mut sc.col22,
+            &mut sc.col23,
+            &mut sc.col24,
+            &mut sc.col3,
+            &mut sc.col4,
+            &mut sc.col5,
+            &mut sc.col6,
+        ] {
+            self.drw.clr_free(clr);
+        }
+        for (_, clr) in self.statusclrs.iter_mut() {
+            self.drw.clr_free(clr);
+        }
+        self.statusclrs.clear();
         // SAFETY: as above; wmcheckwin was created in setup().
         unsafe { XDestroyWindow(self.dpy, self.wmcheckwin) };
+        self.setnormalfont();
+        Drw::fontset_free(&mut self.statusbigfont);
         self.drw.free();
         // SAFETY: as above.
         unsafe {
@@ -1038,7 +1108,6 @@ impl Dwm {
 
     fn drawbar(&mut self, m: MonId) {
         let config = Rc::clone(&self.config);
-        let mut tw = 0;
         let (mut occ, mut urg) = (0u32, 0u32);
         let tagbits = self.tagbits();
         let (bh, lrpad) = (self.bh, self.lrpad);
@@ -1048,12 +1117,11 @@ impl Dwm {
         }
 
         /* draw status first so it can be overdrawn by tags later */
-        if m == self.selmon {
-            /* status is only drawn on selected monitor */
-            self.drw.setscheme(&self.scheme[SCHEME_NORM]);
-            tw = Self::textw(&mut self.drw, lrpad, &self.stext) - lrpad + 2; /* 2px right padding */
-            self.drw.text(self.mons[m].ww - tw, 0, tw as u32, bh as u32, 0, &self.stext, false);
-        }
+        /* status is drawn on every monitor, not just selmon */
+        let stext = mem::take(&mut self.stext); /* borrowed back below, no copy */
+        self.statusw = self.mons[m].ww - self.drawstatusbar(m, bh, &stext);
+        self.stext = stext;
+        let tw = self.statusw;
 
         let mut c = self.mons[m].clients;
         while let Some(i) = c {
@@ -1093,6 +1161,108 @@ impl Dwm {
         for m in 0..self.mons.len() {
             self.drawbar(m);
         }
+    }
+
+    /// Draw the status text right-aligned on monitor `m` (status2d). "^..^"
+    /// codes are not drawn but switch the text color (see `StatusColors`)
+    /// or the font (see statusfontcode()). Returns the x where the status
+    /// starts.
+    fn drawstatusbar(&mut self, m: MonId, bh: i32, stext: &str) -> i32 {
+        let lrpad = self.lrpad;
+        let text = stext.as_bytes();
+        let mut iscode = false;
+
+        /* compute width of the status text */
+        let mut w = 0;
+        let mut s = 0; /* start of the text after the last code */
+        let mut i = 0;
+        while i < text.len() {
+            if text[i] == b'^' {
+                if !iscode {
+                    iscode = true;
+                    w += Self::textw(&mut self.drw, lrpad, &stext[s..i]) - lrpad;
+                    self.statusfontcode(&stext[i + 1..]);
+                } else {
+                    iscode = false;
+                    s = i + 1;
+                }
+            }
+            i += 1;
+        }
+        if !iscode {
+            w += Self::textw(&mut self.drw, lrpad, &stext[s..]) - lrpad;
+        }
+        self.setnormalfont();
+
+        w += 2; /* 1px padding on both sides */
+        let ret = self.mons[m].ww - w;
+        let mut x = ret;
+
+        /* the status scheme is SchemeNorm's colors; the codes change its fg */
+        self.drw.setscheme(&self.scheme[SCHEME_STATUS]);
+        self.drw.rect(x, 0, w as u32, bh as u32, true, true);
+        x += 1;
+
+        /* process status text */
+        self.drw.setfg(self.statusclr.col1);
+        s = 0;
+        i = 0;
+        while i < text.len() {
+            if text[i] == b'^' {
+                iscode = true;
+
+                let w = Self::textw(&mut self.drw, lrpad, &stext[s..i]) - lrpad;
+                self.drw.text(x, 0, w as u32, bh as u32, 0, &stext[s..i], false);
+                x += w;
+                self.statusfontcode(&stext[i + 1..]);
+
+                /* process code */
+                i += 1;
+                while i < text.len() && text[i] != b'^' {
+                    match text[i] {
+                        b'2' => {
+                            /* weather: color by the temperature that follows */
+                            let after = stext[i..].find('^').map_or("", |k| &stext[i + k + 1..]);
+                            let clr = self.weathercolor(after);
+                            self.drw.setfg(clr);
+                        }
+                        b'3' => self.drw.setfg(self.statusclr.col3),
+                        b'4' => self.drw.setfg(self.statusclr.col4),
+                        b'5' => self.drw.setfg(self.statusclr.col5),
+                        b'6' => self.drw.setfg(self.statusclr.col6),
+                        b'c' if text.len() - i >= 8
+                            && text[i + 1] == b'#'
+                            && text[i + 2..i + 8].iter().all(u8::is_ascii_hexdigit) =>
+                        {
+                            /* ^c#rrggbb^: any foreground color */
+                            if let Some(clr) = self.statuscolor(&stext[i + 1..i + 8]) {
+                                self.drw.setfg(clr);
+                            }
+                            i += 7;
+                        }
+                        _ => {} /* ^r, ^b, ^d, ^f and unknown codes are ignored */
+                    }
+                    i += 1;
+                }
+                if i >= text.len() {
+                    break; /* unterminated ^ code */
+                }
+
+                s = i + 1;
+                iscode = false;
+            }
+            i += 1;
+        }
+
+        if !iscode {
+            let w = Self::textw(&mut self.drw, lrpad, &stext[s..]) - lrpad;
+            self.drw.text(x, 0, w as u32, bh as u32, 0, &stext[s..], false);
+        }
+
+        self.drw.setscheme(&self.scheme[SCHEME_NORM]);
+        self.setnormalfont();
+
+        ret
     }
 
     fn expose(&mut self, e: &XEvent) {
@@ -2188,6 +2358,14 @@ impl Dwm {
         self.arrange(Some(selmon));
     }
 
+    /// `drw_setfontset(drw, normalfont)`: back to the font the bar uses.
+    fn setnormalfont(&mut self) {
+        if self.bigfont {
+            self.drw.setfontset(&mut self.statusbigfont);
+            self.bigfont = false;
+        }
+    }
+
     pub fn setup(&mut self) {
         let config = Rc::clone(&self.config);
 
@@ -2211,6 +2389,12 @@ impl Dwm {
         }
         self.lrpad = self.drw.fonts[0].h as i32;
         self.bh = self.drw.fonts[0].h as i32 + 2;
+        /* creating a font set makes it the current one, so switch back; the
+         * big status font is optional: without it ^B^ does nothing */
+        let mut normalfont = mem::take(&mut self.drw.fonts);
+        self.drw.fontset_create(&config.statusbigfonts);
+        self.drw.setfontset(&mut normalfont);
+        self.statusbigfont = normalfont; /* the big font set now, if any */
         self.updategeom();
         /* init atoms */
         let atom = |name: &std::ffi::CStr| -> Atom {
@@ -2241,6 +2425,22 @@ impl Dwm {
         if self.scheme.len() < 2 || self.scheme.iter().any(|s| s.len() < 3) {
             die("dwmr: colors must define the SchemeNorm and SchemeSel schemes with fg, bg and border.");
         }
+        /* status2d: the status text gets its own scheme right after SchemeNorm
+         * and SchemeSel (scheme[LENGTH(colors)]), a copy of SchemeNorm */
+        self.scheme.truncate(SCHEME_STATUS);
+        self.scheme.push(self.drw.scm_create(&config.colors[SCHEME_NORM]));
+        let sc = &config.statuscolors;
+        self.statusclr = StatusClr {
+            col1: self.drw.clr_create(&sc.col1),
+            col21: self.drw.clr_create(&sc.col21),
+            col22: self.drw.clr_create(&sc.col22),
+            col23: self.drw.clr_create(&sc.col23),
+            col24: self.drw.clr_create(&sc.col24),
+            col3: self.drw.clr_create(&sc.col3),
+            col4: self.drw.clr_create(&sc.col4),
+            col5: self.drw.clr_create(&sc.col5),
+            col6: self.drw.clr_create(&sc.col6),
+        };
         /* init bars */
         self.updatebars();
         self.updatestatus();
@@ -2510,6 +2710,37 @@ impl Dwm {
             (i + arg).max(0)
         } else {
             arg
+        }
+    }
+
+    /// The color of a ^c#rrggbb^ status code (`hex` is the "#rrggbb"),
+    /// allocated the first time it is seen and kept for the next redraws;
+    /// None when X cannot allocate it.
+    fn statuscolor(&mut self, hex: &str) -> Option<Clr> {
+        let rgb = u32::from_str_radix(hex.get(1..)?, 16).ok()?;
+        if let Some((_, clr)) = self.statusclrs.iter().find(|(c, _)| *c == rgb) {
+            return Some(*clr);
+        }
+        if self.statusclrs.len() >= STATUSCLRS {
+            /* a status that cycles through colors: start over */
+            for (_, clr) in self.statusclrs.iter_mut() {
+                self.drw.clr_free(clr);
+            }
+            self.statusclrs.clear();
+        }
+        let clr = self.drw.clr_alloc(hex)?;
+        self.statusclrs.push((rgb, clr));
+        Some(clr)
+    }
+
+    /* ^B^ switches the status text to the big font (e.g. for a block's icon),
+     * ^N^ back to the normal one; code points just past the opening '^' */
+    fn statusfontcode(&mut self, code: &str) {
+        if code.starts_with("B^") && !self.bigfont && !self.statusbigfont.is_empty() {
+            self.drw.setfontset(&mut self.statusbigfont);
+            self.bigfont = true;
+        } else if code.starts_with("N^") {
+            self.setnormalfont();
         }
     }
 
@@ -3030,10 +3261,10 @@ impl Dwm {
     }
 
     fn updatestatus(&mut self) {
-        if !Self::gettextprop(self.dpy, self.root, XA_WM_NAME, &mut self.stext, NAME_SIZE) {
+        if !Self::gettextprop(self.dpy, self.root, XA_WM_NAME, &mut self.stext, STEXT_SIZE) {
             self.stext = format!("dwmr-{}", VERSION);
         }
-        self.drawbar(self.selmon);
+        self.drawbars();
     }
 
     fn updatetitle(&mut self, c: ClientId) {
@@ -3209,6 +3440,28 @@ impl Dwm {
         }
 
         None
+    }
+
+    /* Color for the ^2^ weather block, from the temperature that follows the
+     * code in the status text (e.g. "+7°"): +20 and above is hot, below zero
+     * is cold */
+    fn weathercolor(&self, s: &str) -> Clr {
+        let sc = &self.statusclr;
+        for (i, b) in s.bytes().enumerate() {
+            if b == b'^' || b < b' ' {
+                break;
+            }
+            if b == b'+' {
+                return if atoi(&s[i + 1..]) >= 20 { sc.col21 } else { sc.col22 };
+            }
+            if b == b'-' {
+                return sc.col23;
+            }
+            if b.is_ascii_digit() {
+                break;
+            }
+        }
+        sc.col24
     }
 
     fn wintoclient(&self, w: Window) -> Option<ClientId> {

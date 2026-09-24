@@ -31,8 +31,8 @@ Windows are grouped by tags. Each window can be tagged with one or multiple
 tags. Selecting certain tags displays all windows with these tags.
 .P
 Each screen contains a small status bar which displays the tags in use, the
-layout, and the text read from the root window name property, if the screen is
-focused. The title of the focused window is not shown (notitle), so the bar
+layout, and the text read from the root window name property (on every
+screen, not only the focused one). The title of the focused window is not shown (notitle), so the bar
 does not change when a window renames itself. Only tags that are selected or
 have a window are shown; vacant tags take no space (hide_vacant_tags). A
 window tagged on every tag does not make a tag count as occupied. The
@@ -66,7 +66,42 @@ prints version information to stderr, then exits.
 .B X root window name
 is read and displayed in the status text area. It can be set with the
 .BR xsetroot (1)
-command.
+command. Up to 1023 bytes are shown. Codes of the form
+.B ^...^
+are not drawn but change how the following text is drawn (dwm's status2d
+patch, colour codes only): the text starts in
+.BR col1 ;
+.BR ^3^ ,
+.BR ^4^ ,
+.B ^5^
+and
+.B ^6^
+switch to
+.B col3
+to
+.BR col6 ,
+.B ^c#rrggbb^
+to any colour, and
+.B ^2^
+to the weather colour chosen from the temperature that follows it: +20 and
+above
+.BR col21 ,
+below +20
+.BR col22 ,
+negative
+.BR col23 ,
+no sign
+.BR col24
+(all set in
+.BR statuscolors ).
+.B ^B^
+switches to the bigger
+.B statusbigfonts
+until
+.BR ^N^ ,
+e.g. for a block's icon. Other codes are ignored and an unterminated
+.B ^
+ends the text.
 .TP
 .B Button1
 click on a tag label to display all windows with that tag, click on the layout

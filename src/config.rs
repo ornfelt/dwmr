@@ -129,6 +129,23 @@ pub struct Rule {
     pub monitor: i32,
 }
 
+/// The colors of the status text codes (status2d): the text starts in col1,
+/// ^3^..^6^ select col3..col6 and ^2^ the weather color from the temperature
+/// that follows it: +20 and above col21, below +20 col22, negative col23,
+/// none col24.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StatusColors {
+    pub col1: String,
+    pub col21: String,
+    pub col22: String,
+    pub col23: String,
+    pub col24: String,
+    pub col3: String,
+    pub col4: String,
+    pub col5: String,
+    pub col6: String,
+}
+
 pub struct Config {
     /* appearance */
     pub borderpx: u32, /* border pixel of windows */
@@ -144,8 +161,13 @@ pub struct Config {
     pub topbar: bool,  /* false means bottom bar */
     pub focusonwheel: bool, /* false allows the user to scroll window without changing focus */
     pub fonts: Vec<String>,
+    /// Bigger font for status text between ^B^ and ^N^, e.g. a block's icon
+    /// (status2d); empty means none.
+    pub statusbigfonts: Vec<String>,
     /// `[SchemeNorm, SchemeSel]`, each `[fg, bg, border]`.
     pub colors: Vec<Vec<String>>,
+    /// The colors the status text codes select (status2d).
+    pub statuscolors: StatusColors,
 
     /* tagging */
     pub tags: Vec<String>,
@@ -335,7 +357,19 @@ impl Default for Config {
             topbar: true,
             focusonwheel: false,
             fonts: vec!["monospace:size=10".into()],
+            statusbigfonts: vec!["monospace:size=14".into()],
             colors,
+            statuscolors: StatusColors {
+                col1: "#98971a".into(),
+                col21: "#fb4934".into(),
+                col22: "#ebdbb2".into(),
+                col23: "#458588".into(),
+                col24: "#ebdbb2".into(),
+                col3: "#fabd2f".into(),
+                col4: "#83a598".into(),
+                col5: "#d3869b".into(),
+                col6: "#8ec07c".into(),
+            },
             tags,
             scratchpads,
             rules,
@@ -424,7 +458,9 @@ struct RawConfig {
     topbar: Option<bool>,
     focusonwheel: Option<bool>,
     fonts: Option<Vec<String>>,
+    statusbigfonts: Option<Vec<String>>,
     colors: Option<RawColors>,
+    statuscolors: Option<RawStatusColors>,
     /* tagging */
     tags: Option<Vec<String>>,
     scratchpads: Option<Vec<RawScratchpad>>,
@@ -450,6 +486,20 @@ struct RawConfig {
 struct RawColors {
     norm: Option<[String; 3]>,
     sel: Option<[String; 3]>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default, deny_unknown_fields)]
+struct RawStatusColors {
+    col1: Option<String>,
+    col21: Option<String>,
+    col22: Option<String>,
+    col23: Option<String>,
+    col24: Option<String>,
+    col3: Option<String>,
+    col4: Option<String>,
+    col5: Option<String>,
+    col6: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -821,12 +871,33 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
         }
         config.fonts = v;
     }
+    if let Some(v) = raw.statusbigfonts {
+        config.statusbigfonts = v;
+    }
     if let Some(colors) = raw.colors {
         if let Some(norm) = colors.norm {
             config.colors[SCHEME_NORM] = norm.to_vec();
         }
         if let Some(sel) = colors.sel {
             config.colors[SCHEME_SEL] = sel.to_vec();
+        }
+    }
+    if let Some(raw) = raw.statuscolors {
+        let sc = &mut config.statuscolors;
+        for (v, c) in [
+            (raw.col1, &mut sc.col1),
+            (raw.col21, &mut sc.col21),
+            (raw.col22, &mut sc.col22),
+            (raw.col23, &mut sc.col23),
+            (raw.col24, &mut sc.col24),
+            (raw.col3, &mut sc.col3),
+            (raw.col4, &mut sc.col4),
+            (raw.col5, &mut sc.col5),
+            (raw.col6, &mut sc.col6),
+        ] {
+            if let Some(v) = v {
+                *c = v;
+            }
         }
     }
 
@@ -1056,7 +1127,9 @@ mod tests {
         assert_eq!(c.topbar, d.topbar);
         assert_eq!(c.focusonwheel, d.focusonwheel);
         assert_eq!(c.fonts, d.fonts);
+        assert_eq!(c.statusbigfonts, d.statusbigfonts);
         assert_eq!(c.colors, d.colors);
+        assert_eq!(c.statuscolors, d.statuscolors);
         assert_eq!(c.tags, d.tags);
         assert_eq!(c.scratchpads, d.scratchpads);
         assert_eq!(c.rules, d.rules);

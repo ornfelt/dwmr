@@ -24,9 +24,24 @@ showbar = true        # false means no bar
 topbar = true         # false means bottom bar
 focusonwheel = false  # false allows the user to scroll window without changing focus
 fonts = ["monospace:size=10"]
+# bigger font for status text between ^B^ and ^N^, e.g. a block's icon; [] for none
+statusbigfonts = ["monospace:size=14"]
 #              fg         bg         border
 colors.norm = ["#bbbbbb", "#222222", "#444444"]
 colors.sel  = ["#eeeeee", "#005577", "#005577"]
+# status text colours (status2d): the text starts in col1; ^3^..^6^ switch to
+# col3..col6, ^c#rrggbb^ to any colour and ^2^ to the weather colour from the
+# temperature after it: +20 and above col21, below +20 col22, negative col23,
+# no sign col24
+statuscolors.col1  = "#98971a"
+statuscolors.col21 = "#fb4934"
+statuscolors.col22 = "#ebdbb2"
+statuscolors.col23 = "#458588"
+statuscolors.col24 = "#ebdbb2"
+statuscolors.col3  = "#fabd2f"
+statuscolors.col4  = "#83a598"
+statuscolors.col5  = "#d3869b"
+statuscolors.col6  = "#8ec07c"
 
 # tagging
 tags = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]

@@ -30,6 +30,25 @@ pub fn truncate_utf8(s: &mut String, max_bytes: usize) {
     }
 }
 
+/// `atoi()`: the leading integer of `s` after optional whitespace and sign,
+/// 0 if there is none; saturating where C's is undefined.
+pub fn atoi(s: &str) -> i32 {
+    let s = s.trim_start_matches([' ', '\t', '\n', '\r', '\x0b', '\x0c']);
+    let (neg, digits) = match s.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, s.strip_prefix('+').unwrap_or(s)),
+    };
+    let mut n: i32 = 0;
+    for b in digits.bytes().take_while(u8::is_ascii_digit) {
+        n = n.saturating_mul(10).saturating_add((b - b'0') as i32);
+    }
+    if neg {
+        -n
+    } else {
+        n
+    }
+}
+
 /// `BETWEEN(X, A, B)`: A <= X <= B.
 #[allow(dead_code)]
 #[inline]
@@ -49,6 +68,16 @@ mod tests {
         let mut t = String::from("abc");
         truncate_utf8(&mut t, 10);
         assert_eq!(t, "abc");
+    }
+
+    #[test]
+    fn atoi_like_c() {
+        assert_eq!(atoi("42abc"), 42);
+        assert_eq!(atoi("  -7°"), -7);
+        assert_eq!(atoi("+20"), 20);
+        assert_eq!(atoi("abc"), 0);
+        assert_eq!(atoi(""), 0);
+        assert_eq!(atoi("99999999999999999999"), i32::MAX);
     }
 
     #[test]
