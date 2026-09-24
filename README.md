@@ -69,11 +69,18 @@ A few notes on the format:
 - `{ tagkeys = "1", tag = 0 }` in `keys` expands like dwm's `TAGKEYS` macro.
 - Functions: spawn, togglebar, focusstack, pushstack, incnmaster, setmfact,
   zoom, view, killclient, setlayout, togglefloating, togglefullscr,
-  togglesticky, togglescratch, tag, focusmon, tagmon, toggleview, toggletag,
-  shifttag, shiftview, shiftviewclients, defaultgaps, incrgaps, togglegaps,
+  togglesticky, togglescratch, tag, focusmon, focusnthmon, tagmon,
+  tagmonview, tagnthmonview, togglebars, toggleview, toggletag, shifttag,
+  shiftview, shiftviewclients, defaultgaps, incrgaps, togglegaps,
   togglebgaps, sigstatusbar, quit, movemouse, resizemouse.
   Layouts: spiral, tile, bstack, dwindle, deck, monocle, centeredmaster,
   centeredfloatingmaster, none.
+- `tagmonview` sends the focused window to the previous/next monitor like
+  `tagmon`, then focuses it there and warps the pointer to that monitor.
+  `focusnthmon` and `tagnthmonview` do the same as `focusmon` and
+  `tagmonview` for monitor number `{ i = n }` (0 is the first; a number past
+  the end means the last). `togglebars` toggles the bar on every monitor at
+  once, `togglebar` only on the focused one.
 - `scratchpads` is a list of `{ name, cmd }` (dwm's scratchpads patch). Each
   scratchpad owns a tag bit above the normal tags, written `"SPTAG(0)"`,
   `"SPTAG(1)"`, ... in a rule's `tags`; the tags and the scratchpads together

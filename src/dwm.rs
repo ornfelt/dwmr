@@ -1402,6 +1402,23 @@ impl Dwm {
         self.focus(None);
     }
 
+    pub fn focusnthmon(&mut self, arg: &Arg) {
+        if self.mons.len() < 2 {
+            return;
+        }
+        let m = self.numtomon(arg.i());
+        if m == self.selmon {
+            return;
+        }
+        let sel = self.mons[self.selmon].sel;
+        self.unfocus(sel, false);
+        let mon = &self.mons[m];
+        // SAFETY: root is a valid window; the pointer goes to the centre of the monitor's window area.
+        unsafe { XWarpPointer(self.dpy, 0, self.root, 0, 0, 0, 0, mon.wx + mon.ww / 2, mon.wy + mon.wh / 2) };
+        self.selmon = m;
+        self.focus(None);
+    }
+
     pub fn focusstack(&mut self, arg: &Arg) {
         let selmon = self.selmon;
         let mut i = self.stackpos(arg);
@@ -1985,6 +2002,12 @@ impl Dwm {
         c
     }
 
+    /// The monitor at position `num` in the monitor list, or the last one if
+    /// there are fewer; mons is never empty.
+    fn numtomon(&self, num: i32) -> MonId {
+        (num.max(0) as usize).min(self.mons.len() - 1)
+    }
+
     fn pop(&mut self, c: ClientId) {
         self.detach(c);
         self.attach(c);
@@ -2412,6 +2435,29 @@ impl Dwm {
         }
         self.focus(None);
         self.arrange(None);
+    }
+
+    fn sendmonview(&mut self, c: ClientId, m: MonId) {
+        if self.clients[c].mon == m {
+            return;
+        }
+        self.unfocus(Some(c), true);
+        self.detach(c);
+        self.detachstack(c);
+        let old = self.clients[c].mon;
+        self.arrange(Some(old));
+        self.clients[c].mon = m;
+        /* assign tags of target monitor, without any visible scratchpad tags */
+        let tags = self.mons[m].tagset[self.mons[m].seltags] & !self.sptagmask();
+        self.clients[c].tags = if tags != 0 { tags } else { 1 };
+        self.attach(c);
+        self.attachstack(c);
+        let mon = &self.mons[m];
+        // SAFETY: root is a valid window; the pointer goes to the centre of the monitor's window area.
+        unsafe { XWarpPointer(self.dpy, 0, self.root, 0, 0, 0, 0, mon.wx + mon.ww / 2, mon.wy + mon.wh / 2) };
+        self.arrange(Some(m));
+        self.focus(Some(c));
+        self.restack(m);
     }
 
     fn setclientstate(&mut self, c: ClientId, state: c_long) {
@@ -2994,6 +3040,28 @@ impl Dwm {
         self.sendmon(sel, m);
     }
 
+    pub fn tagmonview(&mut self, arg: &Arg) {
+        let Some(sel) = self.mons[self.selmon].sel else {
+            return;
+        };
+        if self.mons.len() < 2 {
+            return;
+        }
+        let m = self.dirtomon(arg.i());
+        self.sendmonview(sel, m);
+    }
+
+    pub fn tagnthmonview(&mut self, arg: &Arg) {
+        let Some(sel) = self.mons[self.selmon].sel else {
+            return;
+        };
+        if self.mons.len() < 2 {
+            return;
+        }
+        let m = self.numtomon(arg.i());
+        self.sendmonview(sel, m);
+    }
+
     pub fn togglebar(&mut self, _arg: &Arg) {
         let selmon = self.selmon;
         self.mons[selmon].showbar = !self.mons[selmon].showbar;
@@ -3002,6 +3070,19 @@ impl Dwm {
         // SAFETY: barwin is a valid window.
         unsafe { XMoveResizeWindow(self.dpy, m.barwin, m.wx, m.by, m.ww as c_uint, self.bh as c_uint) };
         self.arrange(Some(selmon));
+    }
+
+    pub fn togglebars(&mut self, _arg: &Arg) {
+        let showbar = !self.mons[self.selmon].showbar; /* keep all bars in sync */
+
+        for m in 0..self.mons.len() {
+            self.mons[m].showbar = showbar;
+            self.updatebarpos(m);
+            let mon = &self.mons[m];
+            // SAFETY: barwin is a valid window.
+            unsafe { XMoveResizeWindow(self.dpy, mon.barwin, mon.wx, mon.by, mon.ww as c_uint, self.bh as c_uint) };
+            self.arrange(Some(m));
+        }
     }
 
     pub fn togglefloating(&mut self, _arg: &Arg) {

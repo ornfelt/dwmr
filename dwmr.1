@@ -138,6 +138,9 @@ click on a tag label adds/removes that tag to/from the focused window.
 .TP
 .B Button4/Button5
 scrolling on the tag bar views the previous/next tag (shift-tools).
+.TP
+.B Button2
+click on the root window toggles the bar on and off.
 .SS Keyboard commands
 .TP
 .B Mod1\-Shift\-Return
@@ -161,6 +164,26 @@ Send focused window to previous screen, if any.
 .B Mod1\-Shift\-.
 Send focused window to next screen, if any.
 .TP
+.B Mod1\-h / Mod1\-Left
+Focus previous screen, if any.
+.TP
+.B Mod1\-l / Mod1\-Right
+Focus next screen, if any.
+.TP
+.B Mod1\-Shift\-h
+Send focused window to previous screen and focus it there, warping the
+pointer to that screen.
+.TP
+.B Mod1\-Shift\-l
+Send focused window to next screen and focus it there, warping the pointer
+to that screen.
+.TP
+.B Mod1\-Control\-h / Mod1\-Shift\-Left
+Send focused window to previous screen, if any.
+.TP
+.B Mod1\-Control\-l / Mod1\-Shift\-Right
+Send focused window to next screen, if any.
+.TP
 .B Mod1\-'
 Show or hide the first scratchpad window, starting its command if there is
 none yet (scratchpads).
@@ -169,8 +192,11 @@ none yet (scratchpads).
 Show or hide the second scratchpad window, starting its command if there is
 none yet (scratchpads).
 .TP
-.B Mod1\-b
+.B Mod1\-b / Mod1\-Control\-Shift\-p
 Toggles bar on and off.
+.TP
+.B Mod1\-Shift\-p
+Toggles the bars of all screens on and off together.
 .TP
 .B Mod1\-t
 Sets tiled layout.
@@ -214,10 +240,10 @@ Increase number of windows in master area.
 .B Mod1\-d
 Decrease number of windows in master area.
 .TP
-.B Mod1\-l
+.B Mod1\-o
 Increase master area size.
 .TP
-.B Mod1\-h
+.B Mod1\-y
 Decrease master area size.
 .TP
 .B Mod1\-x
