@@ -1006,6 +1006,10 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
             .collect::<Result<Vec<_>, ConfigError>>()?;
     }
     if let Some(v) = raw.statusbar {
+        /* it is run by runautostart() through the shell */
+        if !v.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)) {
+            return err("statusbar must be a program name (letters, digits, '.', '_', '-') or \"\"");
+        }
         config.statusbar = v;
     }
     let nlayouts = config.layouts.len();
@@ -1168,6 +1172,9 @@ mod tests {
         assert!(parse("gappih = 1001").is_err());
         assert!(parse("layouts = [ { symbol = \"x\", arrange = \"fibonacci\" } ]").is_err());
         assert!(parse("nonsense = 1").is_err());
+        assert!(parse("statusbar = \"dwmblocksr; rm -rf ~\"").is_err());
+        assert!(parse("statusbar = \"/usr/bin/dwmblocksr\"").is_err());
+        assert!(parse("statusbar = \"\"").is_ok());
         assert!(parse("keys = [ { mod = \"MODKEY\", key = \"p\", func = \"spawn\", arg = { v = \"nope\" } } ]").is_err());
         assert!(parse("keys = [ { tagkeys = \"1\", tag = 40 } ]").is_err());
         /* scratchpads */

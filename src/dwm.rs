@@ -44,7 +44,7 @@ use x11::xinerama::{XineramaIsActive, XineramaQueryScreens, XineramaScreenInfo};
 use x11::xlib::*;
 
 use crate::config::{
-    Arg, ArrangeFn, Config, Layout, CLK_CLIENT_WIN, CLK_LT_SYMBOL, CLK_ROOT_WIN, CLK_STATUS_TEXT, CLK_TAG_BAR,
+    Arg, ArrangeFn, Command, Config, Layout, CLK_CLIENT_WIN, CLK_LT_SYMBOL, CLK_ROOT_WIN, CLK_STATUS_TEXT, CLK_TAG_BAR,
     SCHEME_NORM, SCHEME_SEL,
 };
 use crate::drw::{Clr, Cur, Drw, Fnt, CLR_NONE, COL_BORDER};
@@ -2224,6 +2224,23 @@ impl Dwm {
                 h(self, &ev); /* call handler */
             }
         }
+    }
+
+    /// Restart the status bar (`statusbar`) with every dwmr start, like the
+    /// autostart patch's runautostart() in my dwm starts dwmblocks. `-w`
+    /// (not in dwm) waits for the old instance to exit, which would otherwise
+    /// clear the root name after the new one has set it. `statusbar = ""`
+    /// starts nothing.
+    pub fn runautostart(&mut self) {
+        let statusbar = &self.config.statusbar;
+        if statusbar.is_empty() {
+            return;
+        }
+        let cmd = Rc::new(Command {
+            name: "autostart".into(),
+            argv: vec!["/bin/sh".into(), "-c".into(), format!("killall -q -w {0}; exec {0}", statusbar)],
+        });
+        self.spawn(&Arg::V(cmd));
     }
 
     pub fn scan(&mut self) {

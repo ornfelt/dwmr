@@ -103,6 +103,12 @@ e.g. for a block's icon. Other codes are ignored and an unterminated
 .B ^
 ends the text.
 .IP
+On startup dwmr kills a running
+.B statusbar
+program (default dwmblocksr) and starts it again;
+.B statusbar = \(dq\(dq
+starts none.
+.IP
 Bytes below 32 are not drawn: status bars like dwmblocksr put a block's
 signal as such a byte before each block, to make the blocks clickable
 (dwm's statuscmd patch).

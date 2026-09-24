@@ -47,6 +47,7 @@ fn main() {
     dwm.checkotherwm();
     dwm.setup();
     dwm.scan();
+    dwm.runautostart();
     dwm.run();
     dwm.cleanup();
     // SAFETY: dpy is a valid display that nothing uses afterwards.
