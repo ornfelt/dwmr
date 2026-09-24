@@ -160,3 +160,11 @@ Also run `dwmr` on the live display once: it must print
 page (the Makefile runs cargo as `$SUDO_USER`, since rustup is per user),
 `make install-config` copies the default config to `~/.config/dwmr/` if none
 exists. `~/.xinitrc` starts it with `WM=dwmr startx`.
+
+## Committing
+
+After completing a feature, patch port or bug fix, and after the checks
+above pass, commit the changes (unless told otherwise) with an appropriate
+commit message: a short summary line naming the change, then a body saying
+what it does and why. No `Co-Authored-By` line. Only files in the repo go in
+the commit; the user's `~/.config/dwmr/config.toml` is never part of it.
