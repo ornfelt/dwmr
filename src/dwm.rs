@@ -216,8 +216,6 @@ pub struct Dwm {
     /// Client slab plus its free list.
     clients: Vec<Client>,
     free_clients: Vec<ClientId>,
-    /// `motionnotify()`'s static `mon`.
-    motion_mon: Option<MonId>,
 }
 
 /// The event handler table (`handler[LASTEvent]`).
@@ -228,13 +226,11 @@ fn handler(ty: c_int) -> Option<fn(&mut Dwm, &XEvent)> {
         ConfigureRequest => Some(Dwm::configurerequest),
         ConfigureNotify => Some(Dwm::configurenotify),
         DestroyNotify => Some(Dwm::destroynotify),
-        EnterNotify => Some(Dwm::enternotify),
         Expose => Some(Dwm::expose),
         FocusIn => Some(Dwm::focusin),
         KeyPress => Some(Dwm::keypress),
         MappingNotify => Some(Dwm::mappingnotify),
         MapRequest => Some(Dwm::maprequest),
-        MotionNotify => Some(Dwm::motionnotify),
         PropertyNotify => Some(Dwm::propertynotify),
         UnmapNotify => Some(Dwm::unmapnotify),
         _ => None,
@@ -282,7 +278,6 @@ impl Dwm {
             wmcheckwin: 0,
             clients: Vec::new(),
             free_clients: Vec::new(),
-            motion_mon: None,
         }
     }
 
@@ -534,7 +529,7 @@ impl Dwm {
         let mut click = CLK_ROOT_WIN;
         /* focus monitor if necessary */
         let m = self.wintomon(ev.window);
-        if m != self.selmon {
+        if m != self.selmon && (config.focusonwheel || (ev.button != Button4 && ev.button != Button5)) {
             let sel = self.mons[self.selmon].sel;
             self.unfocus(sel, true);
             self.selmon = m;
@@ -564,8 +559,11 @@ impl Dwm {
                 click = CLK_WIN_TITLE;
             }
         } else if let Some(c) = self.wintoclient(ev.window) {
-            self.focus(Some(c));
-            self.restack(self.selmon);
+            if config.focusonwheel || (ev.button != Button4 && ev.button != Button5) {
+                /* deliberately no restack() here, unlike dwm and the focusonclick
+                 * patch: a click focuses a floating window without raising it */
+                self.focus(Some(c));
+            }
             // SAFETY: plain Xlib call on an open display.
             unsafe { XAllowEvents(self.dpy, ReplayPointer, CurrentTime) };
             click = CLK_CLIENT_WIN;
@@ -925,27 +923,6 @@ impl Dwm {
         for m in 0..self.mons.len() {
             self.drawbar(m);
         }
-    }
-
-    fn enternotify(&mut self, e: &XEvent) {
-        let ev: XCrossingEvent = e.into();
-
-        if (ev.mode != NotifyNormal || ev.detail == NotifyInferior) && ev.window != self.root {
-            return;
-        }
-        let c = self.wintoclient(ev.window);
-        let m = match c {
-            Some(c) => self.clients[c].mon,
-            None => self.wintomon(ev.window),
-        };
-        if m != self.selmon {
-            let sel = self.mons[self.selmon].sel;
-            self.unfocus(sel, true);
-            self.selmon = m;
-        } else if c.is_none() || c == self.mons[self.selmon].sel {
-            return;
-        }
-        self.focus(c);
     }
 
     fn expose(&mut self, e: &XEvent) {
@@ -1438,22 +1415,6 @@ impl Dwm {
             self.resize(i, wx, wy, ww - 2 * bw, wh - 2 * bw, false);
             c = self.nexttiled(self.clients[i].next);
         }
-    }
-
-    fn motionnotify(&mut self, e: &XEvent) {
-        let ev: XMotionEvent = e.into();
-
-        if ev.window != self.root {
-            return;
-        }
-        let m = self.recttomon(ev.x_root, ev.y_root, 1, 1);
-        if Some(m) != self.motion_mon && self.motion_mon.is_some() {
-            let sel = self.mons[self.selmon].sel;
-            self.unfocus(sel, true);
-            self.selmon = m;
-            self.focus(None);
-        }
-        self.motion_mon = Some(m);
     }
 
     pub fn movemouse(&mut self, _arg: &Arg) {

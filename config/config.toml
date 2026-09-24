@@ -15,6 +15,7 @@ borderpx = 1          # border pixel of windows
 snap = 32             # snap pixel
 showbar = true        # false means no bar
 topbar = true         # false means bottom bar
+focusonwheel = false  # false allows the user to scroll window without changing focus
 fonts = ["monospace:size=10"]
 #              fg         bg         border
 colors.norm = ["#bbbbbb", "#222222", "#444444"]

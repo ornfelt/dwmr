@@ -125,6 +125,7 @@ pub struct Config {
     pub snap: u32,     /* snap pixel */
     pub showbar: bool, /* false means no bar */
     pub topbar: bool,  /* false means bottom bar */
+    pub focusonwheel: bool, /* false allows the user to scroll window without changing focus */
     pub fonts: Vec<String>,
     /// `[SchemeNorm, SchemeSel]`, each `[fg, bg, border]`.
     pub colors: Vec<Vec<String>>,
@@ -263,6 +264,7 @@ impl Default for Config {
             snap: 32,
             showbar: true,
             topbar: true,
+            focusonwheel: false,
             fonts: vec!["monospace:size=10".into()],
             colors,
             tags,
@@ -343,6 +345,7 @@ struct RawConfig {
     snap: Option<u32>,
     showbar: Option<bool>,
     topbar: Option<bool>,
+    focusonwheel: Option<bool>,
     fonts: Option<Vec<String>>,
     colors: Option<RawColors>,
     /* tagging */
@@ -617,6 +620,9 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
     if let Some(v) = raw.topbar {
         config.topbar = v;
     }
+    if let Some(v) = raw.focusonwheel {
+        config.focusonwheel = v;
+    }
     if let Some(v) = raw.fonts {
         if v.is_empty() {
             return err("fonts must not be empty");
@@ -810,6 +816,7 @@ mod tests {
         assert_eq!(c.snap, d.snap);
         assert_eq!(c.showbar, d.showbar);
         assert_eq!(c.topbar, d.topbar);
+        assert_eq!(c.focusonwheel, d.focusonwheel);
         assert_eq!(c.fonts, d.fonts);
         assert_eq!(c.colors, d.colors);
         assert_eq!(c.tags, d.tags);

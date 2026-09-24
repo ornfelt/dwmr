@@ -56,6 +56,9 @@ A few notes on the format:
   `arg = { v = "layouts[2]" }` to an entry of `layouts`. In `dmenucmd` the
   argument after `-m` is replaced with the selected monitor (dwm's dmenumon).
 - Setting only `modkey` rebinds the default keys and buttons to it.
+- Focus follows mouse clicks only, not pointer movement (dwm's focusonclick
+  patch). `focusonwheel = false` (the default) lets the scroll wheel work on
+  an unfocused window without focusing it.
 
 ## Layout of the source
 

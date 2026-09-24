@@ -30,6 +30,11 @@ top left corner.  The tags which are applied to one or more windows are
 indicated with an empty square in the top left corner.
 .P
 dwmr draws a small border around windows to indicate the focus state.
+Focus follows mouse clicks only, never pointer movement (focusonclick). By
+default the scroll wheel (Button4 and Button5) does not change the focus or
+the selected screen either; set
+.B focusonwheel = true
+in the configuration file to make it do so.
 .SH OPTIONS
 .TP
 .B \-v
