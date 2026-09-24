@@ -70,6 +70,30 @@ fn intersect(x: i32, y: i32, w: i32, h: i32, m: &Monitor) -> i32 {
     0.max((x + w).min(m.wx + m.ww) - x.max(m.wx)) * 0.max((y + h).min(m.wy + m.wh) - y.max(m.wy))
 }
 
+/// `GETINC(X)` (stacker)
+#[inline]
+fn getinc(x: i32) -> i32 {
+    x - 2000
+}
+
+/// `INC(X)` (stacker)
+#[inline]
+pub const fn inc(x: i32) -> i32 {
+    x + 2000
+}
+
+/// `ISINC(X)` (stacker)
+#[inline]
+fn isinc(x: i32) -> bool {
+    x > 1000 && x < 3000
+}
+
+/// `MOD(N,M)` (stacker): the non-negative remainder; `m` must be positive
+#[inline]
+fn modulo(n: i32, m: i32) -> i32 {
+    n.rem_euclid(m)
+}
+
 /* enums */
 const CUR_NORMAL: usize = 0;
 const CUR_RESIZE: usize = 1;
@@ -1008,55 +1032,26 @@ impl Dwm {
 
     pub fn focusstack(&mut self, arg: &Arg) {
         let selmon = self.selmon;
-        let mut c: Option<ClientId> = None;
+        let mut i = self.stackpos(arg);
 
-        let Some(sel) = self.mons[selmon].sel else {
-            return;
-        };
-        if self.clients[sel].isfullscreen && self.config.lockfullscreen {
+        if i < 0 || self.mons[selmon].sel.is_some_and(|sel| self.clients[sel].isfullscreen && self.config.lockfullscreen) {
             return;
         }
-        if arg.i() > 0 {
-            c = self.clients[sel].next;
-            while let Some(i) = c {
-                if self.isvisible(i) {
-                    break;
-                }
-                c = self.clients[i].next;
+
+        let mut p = None;
+        let mut c = self.mons[selmon].clients;
+        while let Some(k) = c {
+            if i == 0 && self.isvisible(k) {
+                break;
             }
-            if c.is_none() {
-                c = self.mons[selmon].clients;
-                while let Some(i) = c {
-                    if self.isvisible(i) {
-                        break;
-                    }
-                    c = self.clients[i].next;
-                }
+            if self.isvisible(k) {
+                i -= 1;
             }
-        } else {
-            let mut i = self.mons[selmon].clients;
-            while let Some(k) = i {
-                if k == sel {
-                    break;
-                }
-                if self.isvisible(k) {
-                    c = Some(k);
-                }
-                i = self.clients[k].next;
-            }
-            if c.is_none() {
-                while let Some(k) = i {
-                    if self.isvisible(k) {
-                        c = Some(k);
-                    }
-                    i = self.clients[k].next;
-                }
-            }
+            p = c;
+            c = self.clients[k].next;
         }
-        if let Some(c) = c {
-            self.focus(Some(c));
-            self.restack(selmon);
-        }
+        self.focus(c.or(p));
+        self.restack(selmon);
     }
 
     fn getatomprop(&self, c: ClientId, prop: Atom) -> Atom {
@@ -1581,6 +1576,42 @@ impl Dwm {
                 self.updatewindowtype(c);
             }
         }
+    }
+
+    pub fn pushstack(&mut self, arg: &Arg) {
+        let selmon = self.selmon;
+        let mut i = self.stackpos(arg);
+        let Some(sel) = self.mons[selmon].sel else {
+            return;
+        };
+
+        if i < 0 {
+            return;
+        } else if i == 0 {
+            self.detach(sel);
+            self.attach(sel);
+        } else {
+            let mut p = None;
+            let mut c = self.mons[selmon].clients;
+            while let Some(k) = c {
+                if self.isvisible(k) && k != sel {
+                    i -= 1;
+                    if i == 0 {
+                        break;
+                    }
+                }
+                p = c;
+                c = self.clients[k].next;
+            }
+            /* c is Some here: the list is not empty, so p is the last client if
+             * the walk ran out; pushing sel after itself is a no-op */
+            if let Some(c) = c.or(p) {
+                self.detach(sel);
+                self.clients[sel].next = self.clients[c].next;
+                self.clients[c].next = Some(sel);
+            }
+        }
+        self.arrange(Some(selmon));
     }
 
     pub fn quit(&mut self, _arg: &Arg) {
@@ -2222,6 +2253,56 @@ impl Dwm {
                 libc::execvp(first.as_ptr(), ptrs.as_ptr());
                 die(&format!("dwmr: execvp '{}' failed:", argv[0]));
             }
+        }
+    }
+
+    fn stackpos(&self, arg: &Arg) -> i32 {
+        let selmon = self.selmon;
+        let arg = arg.i();
+
+        if self.mons[selmon].clients.is_none() {
+            return -1;
+        }
+
+        if isinc(arg) {
+            let Some(sel) = self.mons[selmon].sel else {
+                return -1;
+            };
+            let mut i = 0;
+            let mut c = self.mons[selmon].clients;
+            while let Some(k) = c {
+                if k == sel {
+                    break;
+                }
+                if self.isvisible(k) {
+                    i += 1;
+                }
+                c = self.clients[k].next;
+            }
+            let mut n = i;
+            while let Some(k) = c {
+                if self.isvisible(k) {
+                    n += 1;
+                }
+                c = self.clients[k].next;
+            }
+            if n == 0 {
+                /* sel is never invisible; guards the division anyway */
+                return -1;
+            }
+            modulo(i + getinc(arg), n)
+        } else if arg < 0 {
+            let mut i = 0;
+            let mut c = self.mons[selmon].clients;
+            while let Some(k) = c {
+                if self.isvisible(k) {
+                    i += 1;
+                }
+                c = self.clients[k].next;
+            }
+            (i + arg).max(0)
+        } else {
+            arg
         }
     }
 

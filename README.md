@@ -48,10 +48,14 @@ A few notes on the format:
   `"comma"`, `"p"`). Modifiers are `MODKEY`, `ShiftMask`, `ControlMask`,
   `Mod1Mask`..`Mod5Mask`, joined with `|`.
 - `{ tagkeys = "1", tag = 0 }` in `keys` expands like dwm's `TAGKEYS` macro.
-- Functions: spawn, togglebar, focusstack, incnmaster, setmfact, zoom, view,
-  killclient, setlayout, togglefloating, togglefullscr, tag, focusmon, tagmon,
-  toggleview, toggletag, quit, movemouse, resizemouse. Layouts: tile, monocle,
-  none.
+- Functions: spawn, togglebar, focusstack, pushstack, incnmaster, setmfact,
+  zoom, view, killclient, setlayout, togglefloating, togglefullscr, tag,
+  focusmon, tagmon, toggleview, toggletag, quit, movemouse, resizemouse.
+  Layouts: tile, monocle, none.
+- `focusstack` and `pushstack` take a stack position (dwm's stacker patch):
+  `{ i = "INC(+1)" }` is relative to the focused window, `{ i = 0 }` is the
+  top of the stack, `{ i = -1 }` the bottom, another integer an absolute
+  position. `pushstack` moves the focused window to that position.
 - `arg = { v = "termcmd" }` refers to an entry of `commands`;
   `arg = { v = "layouts[2]" }` to an entry of `layouts`. In `dmenucmd` the
   argument after `-m` is replaced with the selected monitor (dwm's dmenumon).

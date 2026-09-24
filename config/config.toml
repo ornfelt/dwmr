@@ -62,8 +62,16 @@ keys = [
 	{ mod = "MODKEY",                   key = "p",        func = "spawn",           arg = { v = "dmenucmd" } },
 	{ mod = "MODKEY|ShiftMask",         key = "Return",   func = "spawn",           arg = { v = "termcmd" } },
 	{ mod = "MODKEY",                   key = "b",        func = "togglebar" },
-	{ mod = "MODKEY",                   key = "j",        func = "focusstack",      arg = { i = 1 } },
-	{ mod = "MODKEY",                   key = "k",        func = "focusstack",      arg = { i = -1 } },
+	# focusstack/pushstack take a stack position (stacker): "INC(n)" is
+	# relative to the focused window, 0 is the top, -1 the bottom.
+	{ mod = "MODKEY",                   key = "j",        func = "focusstack",      arg = { i = "INC(+1)" } },
+	{ mod = "MODKEY",                   key = "k",        func = "focusstack",      arg = { i = "INC(-1)" } },
+	{ mod = "MODKEY|ControlMask",       key = "j",        func = "focusstack",      arg = { i = -1 } },
+	{ mod = "MODKEY|ControlMask",       key = "k",        func = "focusstack",      arg = { i = 0 } },
+	{ mod = "MODKEY|ShiftMask",         key = "j",        func = "pushstack",       arg = { i = "INC(+1)" } },
+	{ mod = "MODKEY|ShiftMask",         key = "k",        func = "pushstack",       arg = { i = "INC(-1)" } },
+	{ mod = "MODKEY|ShiftMask|ControlMask", key = "j",    func = "pushstack",       arg = { i = -1 } },
+	{ mod = "MODKEY|ShiftMask|ControlMask", key = "k",    func = "pushstack",       arg = { i = 0 } },
 	{ mod = "MODKEY",                   key = "i",        func = "incnmaster",      arg = { i = 1 } },
 	{ mod = "MODKEY",                   key = "d",        func = "incnmaster",      arg = { i = -1 } },
 	{ mod = "MODKEY",                   key = "h",        func = "setmfact",        arg = { f = -0.05 } },

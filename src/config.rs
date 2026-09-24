@@ -17,7 +17,7 @@ use serde::Deserialize;
 use x11::keysym::*;
 use x11::xlib::{self, KeySym, XStringToKeysym};
 
-use crate::dwm::{Dwm, MonId};
+use crate::dwm::{inc, Dwm, MonId};
 
 /* enums */
 pub const SCHEME_NORM: usize = 0;
@@ -213,8 +213,14 @@ impl Default for Config {
             k(modkey, XK_p, Dwm::spawn, Arg::V(dmenucmd.clone())),
             k(modkey | xlib::ShiftMask, XK_Return, Dwm::spawn, Arg::V(termcmd.clone())),
             k(modkey, XK_b, Dwm::togglebar, Arg::None),
-            k(modkey, XK_j, Dwm::focusstack, Arg::I(1)),
-            k(modkey, XK_k, Dwm::focusstack, Arg::I(-1)),
+            k(modkey, XK_j, Dwm::focusstack, Arg::I(inc(1))),
+            k(modkey, XK_k, Dwm::focusstack, Arg::I(inc(-1))),
+            k(modkey | xlib::ControlMask, XK_j, Dwm::focusstack, Arg::I(-1)),
+            k(modkey | xlib::ControlMask, XK_k, Dwm::focusstack, Arg::I(0)),
+            k(modkey | xlib::ShiftMask, XK_j, Dwm::pushstack, Arg::I(inc(1))),
+            k(modkey | xlib::ShiftMask, XK_k, Dwm::pushstack, Arg::I(inc(-1))),
+            k(modkey | xlib::ShiftMask | xlib::ControlMask, XK_j, Dwm::pushstack, Arg::I(-1)),
+            k(modkey | xlib::ShiftMask | xlib::ControlMask, XK_k, Dwm::pushstack, Arg::I(0)),
             k(modkey, XK_i, Dwm::incnmaster, Arg::I(1)),
             k(modkey, XK_d, Dwm::incnmaster, Arg::I(-1)),
             k(modkey, XK_h, Dwm::setmfact, Arg::F(-0.05)),
@@ -429,10 +435,42 @@ struct RawButton {
 #[derive(Deserialize, Default)]
 #[serde(default, deny_unknown_fields)]
 struct RawArg {
-    i: Option<i32>,
+    i: Option<IntExpr>,
     ui: Option<UintExpr>,
     f: Option<f32>,
     v: Option<String>,
+}
+
+/// A signed integer, either a TOML integer or a string such as `"-1"` or
+/// `"INC(+1)"` (a relative stack position, dwm's stacker `INC(X)` macro).
+#[derive(Deserialize, Debug, Clone)]
+#[serde(untagged)]
+enum IntExpr {
+    Int(i64),
+    Str(String),
+}
+
+impl IntExpr {
+    fn to_i32(&self) -> Result<i32, ConfigError> {
+        match self {
+            IntExpr::Int(i) => i32::try_from(*i).or_else(|_| err(format!("integer out of range: {}", i))),
+            IntExpr::Str(s) => parse_int_expr(s),
+        }
+    }
+}
+
+/// Parse a decimal integer with an optional sign, or `INC(n)`, into an i32.
+pub fn parse_int_expr(s: &str) -> Result<i32, ConfigError> {
+    let t = s.trim();
+    if let Some(n) = t.strip_prefix("INC(").and_then(|r| r.strip_suffix(')')) {
+        let n = n.trim().trim_start_matches('+');
+        let n: i32 = n.parse().or_else(|_| err(format!("invalid number in '{}'", t)))?;
+        if !(-999..=999).contains(&n) {
+            return err(format!("INC() argument out of range in '{}' (-999..=999)", t));
+        }
+        return Ok(inc(n));
+    }
+    t.trim_start_matches('+').parse::<i32>().or_else(|_| err(format!("invalid number '{}'", t)))
 }
 
 /// An unsigned integer, either a TOML integer or a C-like expression string
@@ -527,6 +565,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "incnmaster" => Dwm::incnmaster,
         "killclient" => Dwm::killclient,
         "movemouse" => Dwm::movemouse,
+        "pushstack" => Dwm::pushstack,
         "quit" => Dwm::quit,
         "resizemouse" => Dwm::resizemouse,
         "setlayout" => Dwm::setlayout,
@@ -573,8 +612,8 @@ fn parse_arg(raw: Option<&RawArg>, commands: &[Rc<Command>], nlayouts: usize) ->
     if set > 1 {
         return err("an argument can only have one of i, ui, f, v");
     }
-    if let Some(i) = raw.i {
-        return Ok(Arg::I(i));
+    if let Some(i) = &raw.i {
+        return Ok(Arg::I(i.to_i32()?));
     }
     if let Some(ui) = &raw.ui {
         return Ok(Arg::Ui(ui.to_u32()?));
@@ -774,6 +813,18 @@ mod tests {
     use super::*;
 
     const DEFAULT_TOML: &str = include_str!("../config/config.toml");
+
+    #[test]
+    fn int_expr() {
+        assert_eq!(parse_int_expr("1").unwrap(), 1);
+        assert_eq!(parse_int_expr("-1").unwrap(), -1);
+        assert_eq!(parse_int_expr("+2").unwrap(), 2);
+        assert_eq!(parse_int_expr("INC(+1)").unwrap(), inc(1));
+        assert_eq!(parse_int_expr(" INC( -1 ) ").unwrap(), inc(-1));
+        assert!(parse_int_expr("INC(1000)").is_err());
+        assert!(parse_int_expr("INC(x)").is_err());
+        assert!(parse_int_expr("x").is_err());
+    }
 
     #[test]
     fn uint_expr() {
