@@ -29,7 +29,9 @@ window tagged on every tag does not make a tag count as occupied. The
 selected tags are indicated with a different color; there are no occupancy
 squares in the tag corners.
 .P
-dwmr draws a small border around windows to indicate the focus state.
+dwmr draws a small border around windows to indicate the focus state. The
+border is omitted when it would carry no information: for the only tiled
+window on a screen and for every window in the monocle layout (noborder).
 Focus follows mouse clicks only, never pointer movement (focusonclick). By
 default the scroll wheel (Button4 and Button5) does not change the focus or
 the selected screen either; set

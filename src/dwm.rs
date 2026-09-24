@@ -41,7 +41,7 @@ use x11::xinerama::{XineramaIsActive, XineramaQueryScreens, XineramaScreenInfo};
 use x11::xlib::*;
 
 use crate::config::{
-    Arg, Config, Layout, CLK_CLIENT_WIN, CLK_LT_SYMBOL, CLK_ROOT_WIN, CLK_STATUS_TEXT, CLK_TAG_BAR,
+    Arg, ArrangeFn, Config, Layout, CLK_CLIENT_WIN, CLK_LT_SYMBOL, CLK_ROOT_WIN, CLK_STATUS_TEXT, CLK_TAG_BAR,
     SCHEME_NORM, SCHEME_SEL,
 };
 use crate::drw::{Clr, Cur, Drw, COL_BORDER};
@@ -1605,10 +1605,29 @@ impl Dwm {
         cl.w = w;
         cl.oldh = cl.h;
         cl.h = h;
-        let mut wc = XWindowChanges { x, y, width: w, height: h, border_width: cl.bw, sibling: 0, stack_mode: 0 };
+        let (m, bw) = (cl.mon, cl.bw);
+        let mut wc = XWindowChanges { x, y, width: w, height: h, border_width: bw, sibling: 0, stack_mode: 0 };
+        /* noborder: the only visible tiled client, or any client in monocle,
+         * fills the space the border would take; c.bw itself is kept */
+        let mon = &self.mons[m];
+        let monocle = self.layouts.get(mon.lt[mon.sellt]).and_then(|l| l.arrange);
+        let cl = &self.clients[c];
+        if ((self.nexttiled(mon.clients) == Some(c) && self.nexttiled(cl.next).is_none())
+            || monocle.is_some_and(|f| std::ptr::fn_addr_eq(f, Dwm::monocle as ArrangeFn)))
+            && !cl.isfullscreen
+            && !cl.isfloating
+        {
+            wc.width += bw * 2;
+            wc.height += bw * 2;
+            wc.border_width = 0;
+            let cl = &mut self.clients[c];
+            cl.w = wc.width;
+            cl.h = wc.height;
+        }
+        let win = self.clients[c].win;
         // SAFETY: wc is initialised; win is a managed window.
         unsafe {
-            XConfigureWindow(self.dpy, cl.win, (CWX | CWY | CWWidth | CWHeight | CWBorderWidth) as c_uint, &mut wc);
+            XConfigureWindow(self.dpy, win, (CWX | CWY | CWWidth | CWHeight | CWBorderWidth) as c_uint, &mut wc);
         }
         self.configure(c);
         // SAFETY: plain Xlib call.

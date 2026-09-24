@@ -61,6 +61,8 @@ A few notes on the format:
 - Only selected or occupied tags are drawn, without the small occupancy
   squares (dwm's hide_vacant_tags patch). A window on every tag does not
   count as occupying them. Clicks on the tag bar follow the same layout.
+- The only tiled window on a monitor, and every window in the monocle layout,
+  is drawn without a border (dwm's noborder patch).
 - Focus follows mouse clicks only, not pointer movement (dwm's focusonclick
   patch). `focusonwheel = false` (the default) lets the scroll wheel work on
   an unfocused window without focusing it.
