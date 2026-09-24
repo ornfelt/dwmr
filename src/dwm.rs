@@ -2218,6 +2218,69 @@ impl Dwm {
         }
     }
 
+    /// The circular shift of `tags` by `arg.i` within the normal tags (the
+    /// shift-tools patch, scratchpads variant): i > 0 is a left, i < 0 a
+    /// right circular shift, and the result is masked to the normal tag
+    /// bits. dwm shifts by arg->i as given; reducing it modulo LENGTH(tags)
+    /// gives the same rotation and keeps every shift count below 32 for any
+    /// configured value.
+    fn shifttags(&self, tags: u32, i: i32) -> u32 {
+        let n = self.config.tags.len() as u32; /* 1..=31, checked by the config loader */
+        let tagbits = self.tagbits();
+        let k = i.rem_euclid(n as i32) as u32;
+        if k == 0 {
+            return tags & tagbits;
+        }
+        ((tags << k) | (tags >> (n - k))) & tagbits
+    }
+
+    /* Sends a window to the next/prev tag */
+    pub fn shifttag(&mut self, arg: &Arg) {
+        let selmon = self.selmon;
+        let seltags = self.mons[selmon].seltags;
+        let shifted = self.mons[selmon].tagset[seltags] & !self.sptagmask();
+        let shifted = Arg::Ui(self.shifttags(shifted, arg.i()));
+        self.tag(&shifted);
+    }
+
+    /* Navigate to the next/prev tag */
+    pub fn shiftview(&mut self, arg: &Arg) {
+        let selmon = self.selmon;
+        let seltags = self.mons[selmon].seltags;
+        let shifted = self.mons[selmon].tagset[seltags] & !self.sptagmask();
+        let shifted = Arg::Ui(self.shifttags(shifted, arg.i()));
+        self.view(&shifted);
+    }
+
+    /* Navigate to the next/prev tag that has a client, else moves it to the next/prev tag */
+    pub fn shiftviewclients(&mut self, arg: &Arg) {
+        let selmon = self.selmon;
+        let sptagmask = self.sptagmask();
+        let mut tagmask = 0;
+        let seltags = self.mons[selmon].seltags;
+        let mut shifted = self.mons[selmon].tagset[seltags] & !sptagmask;
+
+        let mut c = self.mons[selmon].clients;
+        while let Some(k) = c {
+            if self.clients[k].tags & sptagmask == 0 {
+                tagmask |= self.clients[k].tags;
+            }
+            c = self.clients[k].next;
+        }
+
+        /* dwm shifts until the result hits an occupied tag. The rotation
+         * repeats after LENGTH(tags) steps, so stop there instead of spinning
+         * when it never hits one: a view of only a scratchpad tag shifts to
+         * nothing, and a shift by a multiple of LENGTH(tags) stays put. */
+        for _ in 0..self.config.tags.len() {
+            shifted = self.shifttags(shifted, arg.i());
+            if tagmask == 0 || shifted & tagmask != 0 {
+                break;
+            }
+        }
+        self.view(&Arg::Ui(shifted));
+    }
+
     fn showhide(&mut self, c: Option<ClientId>) {
         let Some(c) = c else {
             return;

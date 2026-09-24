@@ -51,7 +51,7 @@ A few notes on the format:
 - Functions: spawn, togglebar, focusstack, pushstack, incnmaster, setmfact,
   zoom, view, killclient, setlayout, togglefloating, togglefullscr,
   togglesticky, togglescratch, tag, focusmon, tagmon, toggleview, toggletag,
-  quit, movemouse, resizemouse.
+  shifttag, shiftview, shiftviewclients, quit, movemouse, resizemouse.
   Layouts: tile, monocle, none.
 - `scratchpads` is a list of `{ name, cmd }` (dwm's scratchpads patch). Each
   scratchpad owns a tag bit above the normal tags, written `"SPTAG(0)"`,
@@ -64,6 +64,14 @@ A few notes on the format:
   `{ i = "INC(+1)" }` is relative to the focused window, `{ i = 0 }` is the
   top of the stack, `{ i = -1 }` the bottom, another integer an absolute
   position. `pushstack` moves the focused window to that position.
+- `shifttag`, `shiftview` and `shiftviewclients` (dwm's shift-tools patch)
+  take `{ i = n }`: the viewed normal tags are circularly shifted by `n`
+  positions (left for positive, right for negative, wrapping at the number
+  of tags). `shifttag` moves the focused window there, `shiftview` views it
+  and `shiftviewclients` keeps shifting until it reaches a tag that has a
+  window, ignoring windows on scratchpad tags. Bound by default to
+  Mod1-Shift-y/o, the mouse wheel on the tag bar and Mod1-(Shift-)Tab; the
+  latter replaces dwm's Mod1-Tab "view previous tags".
 - `arg = { v = "termcmd" }` refers to an entry of `commands`;
   `arg = { v = "layouts[2]" }` to an entry of `layouts`. In `dmenucmd` the
   argument after `-m` is replaced with the selected monitor (dwm's dmenumon).

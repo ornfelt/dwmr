@@ -249,7 +249,8 @@ impl Default for Config {
             k(modkey, XK_h, Dwm::setmfact, Arg::F(-0.05)),
             k(modkey, XK_l, Dwm::setmfact, Arg::F(0.05)),
             k(modkey, XK_Return, Dwm::zoom, Arg::None),
-            k(modkey, XK_Tab, Dwm::view, Arg::None),
+            k(modkey, XK_Tab, Dwm::shiftviewclients, Arg::I(1)),
+            k(modkey | xlib::ShiftMask, XK_Tab, Dwm::shiftviewclients, Arg::I(-1)),
             k(modkey | xlib::ShiftMask, XK_c, Dwm::killclient, Arg::None),
             k(modkey, XK_t, Dwm::setlayout, Arg::Layout(0)),
             k(modkey, XK_f, Dwm::setlayout, Arg::Layout(1)),
@@ -258,6 +259,8 @@ impl Default for Config {
             k(modkey | xlib::ShiftMask, XK_space, Dwm::togglefloating, Arg::None),
             k(modkey | xlib::ShiftMask, XK_f, Dwm::togglefullscr, Arg::None),
             k(modkey | xlib::ShiftMask, XK_less, Dwm::togglesticky, Arg::None),
+            k(modkey | xlib::ShiftMask, XK_y, Dwm::shifttag, Arg::I(1)),
+            k(modkey | xlib::ShiftMask, XK_o, Dwm::shifttag, Arg::I(-1)),
             k(modkey, XK_0, Dwm::view, Arg::Ui(!0)),
             k(modkey | xlib::ShiftMask, XK_0, Dwm::tag, Arg::Ui(!0)),
             k(modkey, XK_comma, Dwm::focusmon, Arg::I(-1)),
@@ -287,6 +290,8 @@ impl Default for Config {
             b(CLK_TAG_BAR, 0, xlib::Button3, Dwm::toggleview, Arg::None),
             b(CLK_TAG_BAR, modkey, xlib::Button1, Dwm::tag, Arg::None),
             b(CLK_TAG_BAR, modkey, xlib::Button3, Dwm::toggletag, Arg::None),
+            b(CLK_TAG_BAR, 0, xlib::Button4, Dwm::shiftview, Arg::I(-1)),
+            b(CLK_TAG_BAR, 0, xlib::Button5, Dwm::shiftview, Arg::I(1)),
         ];
 
         Config {
@@ -631,6 +636,9 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "resizemouse" => Dwm::resizemouse,
         "setlayout" => Dwm::setlayout,
         "setmfact" => Dwm::setmfact,
+        "shifttag" => Dwm::shifttag,
+        "shiftview" => Dwm::shiftview,
+        "shiftviewclients" => Dwm::shiftviewclients,
         "spawn" => Dwm::spawn,
         "tag" => Dwm::tag,
         "tagmon" => Dwm::tagmon,
