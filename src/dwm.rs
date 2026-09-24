@@ -2331,6 +2331,14 @@ impl Dwm {
         self.arrange(Some(selmon));
     }
 
+    pub fn togglefullscr(&mut self, _arg: &Arg) {
+        let selmon = self.selmon;
+        if let Some(sel) = self.mons[selmon].sel {
+            let fullscreen = !self.clients[sel].isfullscreen;
+            self.setfullscreen(sel, fullscreen);
+        }
+    }
+
     pub fn toggletag(&mut self, arg: &Arg) {
         let selmon = self.selmon;
         let Some(sel) = self.mons[selmon].sel else {
