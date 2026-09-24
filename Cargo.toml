@@ -1,0 +1,29 @@
+[package]
+name = "dwmr"
+version = "6.8.0"
+edition = "2021"
+description = "dynamic window manager - a Rust port of dwm"
+license = "MIT"
+readme = "README.md"
+default-run = "dwmr"
+
+[[bin]]
+name = "dwmr"
+path = "src/main.rs"
+
+[dependencies]
+libc = "0.2"
+x11 = { version = "2.21", features = ["xlib", "xft", "xrender"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+[features]
+# Xinerama (multi-monitor) support, like XINERAMAFLAGS in dwm's config.mk
+default = ["xinerama"]
+xinerama = ["x11/xinerama"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

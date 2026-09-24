@@ -1,0 +1,113 @@
+# See LICENSE file for copyright and license details.
+#
+# dwmr configuration: ~/.config/dwmr/config.toml
+#
+# This file mirrors dwm's config.def.h and every value below is also the
+# compiled-in default, so any key you leave out keeps its default. If the file
+# fails to parse, dwmr prints the error on stderr and starts with the defaults.
+#
+# Integer masks may be written like in C: "1 << 8", "~0", "0x1ff", "1 | 2".
+# Key names are X keysym names without the XK_ prefix (see /usr/include/X11/keysymdef.h).
+# Modifiers: MODKEY, ShiftMask, ControlMask, LockMask, Mod1Mask .. Mod5Mask, joined with "|".
+
+# appearance
+borderpx = 1          # border pixel of windows
+snap = 32             # snap pixel
+showbar = true        # false means no bar
+topbar = true         # false means bottom bar
+fonts = ["monospace:size=10"]
+#              fg         bg         border
+colors.norm = ["#bbbbbb", "#222222", "#444444"]
+colors.sel  = ["#eeeeee", "#005577", "#005577"]
+
+# tagging
+tags = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+
+# xprop(1):
+#	WM_CLASS(STRING) = instance, class
+#	WM_NAME(STRING) = title
+# class, instance and title are substring matches; omit one to match anything.
+rules = [
+	#  class              instance   title   tags mask        isfloating           monitor
+	{ class = "Gimp",                                tags = 0,        isfloating = true,   monitor = -1 },
+	{ class = "Firefox",                             tags = "1 << 8", isfloating = false,  monitor = -1 },
+]
+
+# layout(s)
+mfact = 0.55          # factor of master area size [0.05..0.95]
+nmaster = 1           # number of clients in master area
+resizehints = true    # true means respect size hints in tiled resizals
+lockfullscreen = true # true will force focus on the fullscreen window
+refreshrate = 120     # refresh rate (per second) for client move/resize
+
+layouts = [
+	#  symbol          arrange function
+	{ symbol = "[]=",  arrange = "tile" },     # first entry is default
+	{ symbol = "><>",  arrange = "none" },     # no layout function means floating behavior
+	{ symbol = "[M]",  arrange = "monocle" },
+]
+
+# key definitions
+modkey = "Mod1Mask"
+
+# commands
+# The argument after "-m" in dmenucmd is replaced with the selected monitor's
+# number by spawn(), like dmenumon in dwm.
+commands.dmenucmd = ["dmenu_run", "-m", "0", "-fn", "monospace:size=10", "-nb", "#222222", "-nf", "#bbbbbb", "-sb", "#005577", "-sf", "#eeeeee"]
+commands.termcmd  = ["st"]
+
+keys = [
+	#  modifier                         key               function                  argument
+	{ mod = "MODKEY",                   key = "p",        func = "spawn",           arg = { v = "dmenucmd" } },
+	{ mod = "MODKEY|ShiftMask",         key = "Return",   func = "spawn",           arg = { v = "termcmd" } },
+	{ mod = "MODKEY",                   key = "b",        func = "togglebar" },
+	{ mod = "MODKEY",                   key = "j",        func = "focusstack",      arg = { i = 1 } },
+	{ mod = "MODKEY",                   key = "k",        func = "focusstack",      arg = { i = -1 } },
+	{ mod = "MODKEY",                   key = "i",        func = "incnmaster",      arg = { i = 1 } },
+	{ mod = "MODKEY",                   key = "d",        func = "incnmaster",      arg = { i = -1 } },
+	{ mod = "MODKEY",                   key = "h",        func = "setmfact",        arg = { f = -0.05 } },
+	{ mod = "MODKEY",                   key = "l",        func = "setmfact",        arg = { f = 0.05 } },
+	{ mod = "MODKEY",                   key = "Return",   func = "zoom" },
+	{ mod = "MODKEY",                   key = "Tab",      func = "view" },
+	{ mod = "MODKEY|ShiftMask",         key = "c",        func = "killclient" },
+	{ mod = "MODKEY",                   key = "t",        func = "setlayout",       arg = { v = "layouts[0]" } },
+	{ mod = "MODKEY",                   key = "f",        func = "setlayout",       arg = { v = "layouts[1]" } },
+	{ mod = "MODKEY",                   key = "m",        func = "setlayout",       arg = { v = "layouts[2]" } },
+	{ mod = "MODKEY",                   key = "space",    func = "setlayout" },
+	{ mod = "MODKEY|ShiftMask",         key = "space",    func = "togglefloating" },
+	{ mod = "MODKEY",                   key = "0",        func = "view",            arg = { ui = "~0" } },
+	{ mod = "MODKEY|ShiftMask",         key = "0",        func = "tag",             arg = { ui = "~0" } },
+	{ mod = "MODKEY",                   key = "comma",    func = "focusmon",        arg = { i = -1 } },
+	{ mod = "MODKEY",                   key = "period",   func = "focusmon",        arg = { i = 1 } },
+	{ mod = "MODKEY|ShiftMask",         key = "comma",    func = "tagmon",          arg = { i = -1 } },
+	{ mod = "MODKEY|ShiftMask",         key = "period",   func = "tagmon",          arg = { i = 1 } },
+	# TAGKEYS(KEY, TAG): MODKEY+key views the tag, +Control toggles the view,
+	# +Shift tags the window and +Control+Shift toggles the window's tag.
+	{ tagkeys = "1",                    tag = 0 },
+	{ tagkeys = "2",                    tag = 1 },
+	{ tagkeys = "3",                    tag = 2 },
+	{ tagkeys = "4",                    tag = 3 },
+	{ tagkeys = "5",                    tag = 4 },
+	{ tagkeys = "6",                    tag = 5 },
+	{ tagkeys = "7",                    tag = 6 },
+	{ tagkeys = "8",                    tag = 7 },
+	{ tagkeys = "9",                    tag = 8 },
+	{ mod = "MODKEY|ShiftMask",         key = "q",        func = "quit" },
+]
+
+# button definitions
+# click can be ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle, ClkClientWin, or ClkRootWin
+buttons = [
+	#  click                    event mask         button               function                  argument
+	{ click = "ClkLtSymbol",    mask = "0",        button = "Button1",  func = "setlayout" },
+	{ click = "ClkLtSymbol",    mask = "0",        button = "Button3",  func = "setlayout",       arg = { v = "layouts[2]" } },
+	{ click = "ClkWinTitle",    mask = "0",        button = "Button2",  func = "zoom" },
+	{ click = "ClkStatusText",  mask = "0",        button = "Button2",  func = "spawn",           arg = { v = "termcmd" } },
+	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button1",  func = "movemouse" },
+	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button2",  func = "togglefloating" },
+	{ click = "ClkClientWin",   mask = "MODKEY",   button = "Button3",  func = "resizemouse" },
+	{ click = "ClkTagBar",      mask = "0",        button = "Button1",  func = "view" },
+	{ click = "ClkTagBar",      mask = "0",        button = "Button3",  func = "toggleview" },
+	{ click = "ClkTagBar",      mask = "MODKEY",   button = "Button1",  func = "tag" },
+	{ click = "ClkTagBar",      mask = "MODKEY",   button = "Button3",  func = "toggletag" },
+]
