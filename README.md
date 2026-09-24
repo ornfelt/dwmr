@@ -58,6 +58,9 @@ A few notes on the format:
 - Setting only `modkey` rebinds the default keys and buttons to it.
 - The bar shows no window title and has no title click area (dwm's notitle
   patch); `ClkWinTitle` is not a valid click.
+- Only selected or occupied tags are drawn, without the small occupancy
+  squares (dwm's hide_vacant_tags patch). A window on every tag does not
+  count as occupying them. Clicks on the tag bar follow the same layout.
 - Focus follows mouse clicks only, not pointer movement (dwm's focusonclick
   patch). `focusonwheel = false` (the default) lets the scroll wheel work on
   an unfocused window without focusing it.

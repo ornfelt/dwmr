@@ -538,8 +538,19 @@ impl Dwm {
         if ev.window == self.mons[self.selmon].barwin {
             let mut i = 0;
             let mut x = 0;
+            let mut occ = 0u32;
+            let tagmask = self.tagmask();
+            let mut c = self.mons[self.selmon].clients;
+            while let Some(j) = c {
+                occ |= if self.clients[j].tags == tagmask { 0 } else { self.clients[j].tags };
+                c = self.clients[j].next;
+            }
             loop {
-                x += Self::textw(&mut self.drw, self.lrpad, &config.tags[i]);
+                /* Do not reserve space for vacant tags */
+                let mon = &self.mons[self.selmon];
+                if occ & 1 << i != 0 || mon.tagset[mon.seltags] & 1 << i != 0 {
+                    x += Self::textw(&mut self.drw, self.lrpad, &config.tags[i]);
+                }
                 if ev.x >= x {
                     i += 1;
                     if i < config.tags.len() {
@@ -860,9 +871,8 @@ impl Dwm {
     fn drawbar(&mut self, m: MonId) {
         let config = Rc::clone(&self.config);
         let mut tw = 0;
-        let boxs = (self.drw.fonts[0].h / 9) as i32;
-        let boxw = self.drw.fonts[0].h / 6 + 2;
         let (mut occ, mut urg) = (0u32, 0u32);
+        let tagmask = self.tagmask();
         let (bh, lrpad) = (self.bh, self.lrpad);
 
         if !self.mons[m].showbar {
@@ -879,7 +889,7 @@ impl Dwm {
 
         let mut c = self.mons[m].clients;
         while let Some(i) = c {
-            occ |= self.clients[i].tags;
+            occ |= if self.clients[i].tags == tagmask { 0 } else { self.clients[i].tags };
             if self.clients[i].isurgent {
                 urg |= self.clients[i].tags;
             }
@@ -887,16 +897,15 @@ impl Dwm {
         }
         let mut x = 0;
         for (i, tag) in config.tags.iter().enumerate() {
-            let w = Self::textw(&mut self.drw, lrpad, tag);
             let mon = &self.mons[m];
+            /* Do not draw vacant tags */
+            if !(occ & 1 << i != 0 || mon.tagset[mon.seltags] & 1 << i != 0) {
+                continue;
+            }
+            let w = Self::textw(&mut self.drw, lrpad, tag);
             let scheme = if mon.tagset[mon.seltags] & 1 << i != 0 { SCHEME_SEL } else { SCHEME_NORM };
             self.drw.setscheme(&self.scheme[scheme]);
             self.drw.text(x, 0, w as u32, bh as u32, (lrpad / 2) as u32, tag, urg & 1 << i != 0);
-            if occ & 1 << i != 0 {
-                let filled = m == self.selmon
-                    && self.mons[self.selmon].sel.is_some_and(|sel| self.clients[sel].tags & 1 << i != 0);
-                self.drw.rect(x + boxs, boxs, boxw, boxw, filled, urg & 1 << i != 0);
-            }
             x += w;
         }
         let w = Self::textw(&mut self.drw, lrpad, &self.mons[m].ltsymbol);

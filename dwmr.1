@@ -20,13 +20,14 @@ layout applied.
 Windows are grouped by tags. Each window can be tagged with one or multiple
 tags. Selecting certain tags displays all windows with these tags.
 .P
-Each screen contains a small status bar which displays all available tags, the
+Each screen contains a small status bar which displays the tags in use, the
 layout, and the text read from the root window name property, if the screen is
 focused. The title of the focused window is not shown (notitle), so the bar
-does not change when a window renames itself. The selected tags are indicated
-with a different color. The tags of the focused window are indicated with a
-filled square in the top left corner.  The tags which are applied to one or
-more windows are indicated with an empty square in the top left corner.
+does not change when a window renames itself. Only tags that are selected or
+have a window are shown; vacant tags take no space (hide_vacant_tags). A
+window tagged on every tag does not make a tag count as occupied. The
+selected tags are indicated with a different color; there are no occupancy
+squares in the tag corners.
 .P
 dwmr draws a small border around windows to indicate the focus state.
 Focus follows mouse clicks only, never pointer movement (focusonclick). By
