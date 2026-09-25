@@ -173,6 +173,9 @@ A few notes on the format:
   keeps a window from swallowing its terminal. Floating windows only swallow
   with `swallowfloating = true`. The terminal is found through the window's
   PID (from the X-Resource extension) and its parents in `/proc`.
+- Every colour gets an opaque alpha byte, so the borders of 32-bit (ARGB)
+  windows do not turn transparent under a compositor like picom. This is not
+  dwm's alpha patch: the bar and the windows keep the default visual.
 
 ## Layout of the source
 

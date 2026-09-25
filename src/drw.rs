@@ -270,7 +270,13 @@ impl Drw {
                 &mut dest,
             )
         };
-        (ok != 0).then_some(dest)
+        if ok == 0 {
+            return None;
+        }
+        /* an opaque alpha byte, so the borders of 32-bit (ARGB) windows do not
+         * turn transparent under picom (not the alpha patch: no ARGB visual) */
+        dest.pixel |= 0xff << 24;
+        Some(dest)
     }
 
     /// Create a color scheme. Needs at least two colors; returns an empty
