@@ -123,7 +123,7 @@ commands.fzfopencmd        = ["/bin/sh", "-c", "~/.local/bin/my_scripts/fzf_open
 commands.termcalccmd       = ["/bin/sh", "-c", "~/.local/bin/my_scripts/term_calc.sh wezterm"]
 commands.calendarcmd       = ["/bin/sh", "-c", "yad --calendar --no-buttons"]
 commands.htopcmd           = ["/bin/sh", "-c", "wezterm -e htop"]
-commands.bashtopcmd        = ["/bin/sh", "-c", "wezterm -e bashtop"]
+commands.btopcmd           = ["/bin/sh", "-c", "wezterm -e btop"]
 commands.ytopcmd           = ["/bin/sh", "-c", "wezterm -e ytop"]
 commands.xrandrcmd         = ["/bin/sh", "-c", "~/.local/bin/my_scripts/xrandr_helper.sh"]
 commands.fileswdcmd        = ["/bin/sh", "-c", "~/.local/bin/my_scripts/files_wd.sh"]
@@ -342,8 +342,8 @@ keys = [
 	{ mod = "MODKEY|ControlMask",       key = "c",        func = "spawn",           arg = { v = "calendarcmd" } },
 	# /* bind mod-b: spawn htop */
 	{ mod = "MODKEY",                   key = "b",        func = "spawn",           arg = { v = "htopcmd" } },
-	# /* bind mod-shift-b: spawn bashtop */
-	{ mod = "MODKEY|ShiftMask",         key = "b",        func = "spawn",           arg = { v = "bashtopcmd" } },
+	# /* bind mod-shift-b: spawn btop */
+	{ mod = "MODKEY|ShiftMask",         key = "b",        func = "spawn",           arg = { v = "btopcmd" } },
 	# /* bind mod-ctrl-b: spawn ytop */
 	{ mod = "MODKEY|ControlMask",       key = "b",        func = "spawn",           arg = { v = "ytopcmd" } },
 	# /* bind mod-p: spawn xrandr_helper.sh */
