@@ -3382,7 +3382,8 @@ impl Dwm {
         wa.override_redirect = True;
         wa.background_pixmap = ParentRelative as Pixmap;
         wa.event_mask = ButtonPressMask | ExposureMask;
-        let class = c"dwmr";
+        /* dwm's class, which scripts and compositor rules look the bar up by */
+        let class = c"dwm";
         let mut ch = XClassHint { res_name: class.as_ptr() as *mut c_char, res_class: class.as_ptr() as *mut c_char };
         for m in self.mons.iter_mut() {
             if m.barwin != 0 {
