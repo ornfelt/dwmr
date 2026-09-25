@@ -44,7 +44,7 @@ The priorities, in order:
 | drw.c/drw.h    | `src/drw.rs`          | `Drw`, `Fnt` (in a `Vec`, index 0 is the primary font), `Clr` = `XftColor`, `Cur` |
 | util.c/util.h  | `src/util.rs`         | `die()`, `truncate_utf8()` (the `char[N]` buffer limits), `between()` |
 | config.def.h   | `src/config.rs`       | `Config::default()` is config.def.h; the rest is the TOML loader |
-| config.h       | `config/config.toml`  | the shipped default config; must equal `Config::default()` (a unit test checks this) |
+| config.h       | `config/config.toml`  | the shipped config: the user's config.h on top of `Config::default()` (the test `shipped_config_is_config_h` checks it parses and holds config.h) |
 | transient.c    | `examples/transient.rs` | |
 | dwm.1, Makefile | `dwmr.1`, `Makefile`  | `make`, `sudo make install`, `make install-config` |
 | fontconfig     | `src/fontconfig.rs`   | the FFI declarations drw needs that the `x11` crate lacks |
@@ -107,14 +107,15 @@ Reference C source, if needed for comparison: `~/Downloads/dwm` (dwm 6.8).
    - the raw TOML shape (`RawConfig` etc.) and the conversion in `parse()`,
      with validation that rejects values that could crash (zero divisors,
      out-of-range indices, empty lists),
-   - `config/config.toml` (same value, commented like config.def.h),
+   - `config/config.toml` (the user's value from their config.h, commented
+     like config.h),
    - `~/.config/dwmr/config.toml` is the user's copy; do not edit it unless
      asked, but tell the user what to add.
    New key/button functions must be added to `parse_func()`; new layout
    functions to `parse_arrange()`; new `Arg` kinds to `parse_arg()`.
-3. If the patch adds a key binding, add it to both the `keys` vector in
-   `Config::default()` and `config/config.toml`; the test
-   `shipped_config_matches_defaults` will fail until both agree.
+3. If the patch adds a key binding, add config.def.h's binding to the `keys`
+   vector in `Config::default()` and the user's (from config.h, with its
+   `/* bind ... */` comment) to `config/config.toml`.
 4. Update `dwmr.1` and `README.md` if user-visible behaviour or config keys
    change. The version stays in `Cargo.toml` (`dwmr -v` prints it).
 

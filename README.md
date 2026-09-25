@@ -39,8 +39,9 @@ The file mirrors dwm's config.def.h section by section: appearance, colors,
 tags, rules, layouts, the modifier key, commands, keys and buttons. Every key
 is optional and falls back to the built-in default, which is dwm's default
 configuration. A file that fails to parse is reported on stderr and ignored,
-so the window manager always starts. See `config/config.toml` for the
-commented default.
+so the window manager always starts. `config/config.toml` is my own
+configuration (my dwm config.h, commented the same way); keys it leaves out
+keep the built-in defaults.
 
 ### X resources
 
@@ -194,7 +195,7 @@ Xinerama support is the `xinerama` cargo feature (on by default), like
 builds without it.
 
 `cargo test` checks the config parser, including that `config/config.toml`
-produces exactly the built-in defaults.
+parses and holds my config.h.
 
 ## License
 

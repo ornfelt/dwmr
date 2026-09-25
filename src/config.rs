@@ -1155,41 +1155,30 @@ mod tests {
         assert_eq!(c.tags, d.tags);
     }
 
-    /// The shipped config/config.toml must be exactly config.def.h.
+    /// The shipped config/config.toml is my config.h, on top of config.def.h.
     #[test]
-    fn shipped_config_matches_defaults() {
+    fn shipped_config_is_config_h() {
         let c = parse(DEFAULT_TOML).expect("config/config.toml parses");
-        let d = Config::default();
-        assert_eq!(c.borderpx, d.borderpx);
-        assert_eq!((c.gappih, c.gappiv, c.gappoh, c.gappov), (d.gappih, d.gappiv, d.gappoh, d.gappov));
-        assert_eq!((c.smartgaps, c.browsergaps), (d.smartgaps, d.browsergaps));
-        assert_eq!(c.snap, d.snap);
-        assert_eq!(c.swallowfloating, d.swallowfloating);
-        assert_eq!(c.showbar, d.showbar);
-        assert_eq!(c.topbar, d.topbar);
-        assert_eq!(c.focusonwheel, d.focusonwheel);
-        assert_eq!(c.fonts, d.fonts);
-        assert_eq!(c.statusbigfonts, d.statusbigfonts);
-        assert_eq!(c.colors, d.colors);
-        assert_eq!(c.statuscolors, d.statuscolors);
-        assert_eq!(c.tags, d.tags);
-        assert_eq!(c.scratchpads, d.scratchpads);
-        assert_eq!(c.rules, d.rules);
-        assert_eq!(c.mfact, d.mfact);
-        assert_eq!(c.nmaster, d.nmaster);
-        assert_eq!(c.resizehints, d.resizehints);
-        assert_eq!(c.lockfullscreen, d.lockfullscreen);
-        assert_eq!(c.refreshrate, d.refreshrate);
-        assert_eq!(c.modkey, d.modkey);
-        let syms = |l: &[Layout]| l.iter().map(|l| (l.symbol.clone(), l.arrange.is_some())).collect::<Vec<_>>();
-        assert_eq!(syms(&c.layouts), syms(&d.layouts));
-        assert_eq!(c.commands, d.commands);
-        assert_eq!(c.statusbar, d.statusbar);
-        assert_eq!(c.autostart, d.autostart);
-        let keys = |k: &[Key]| k.iter().map(|k| (k.mod_, k.keysym, k.arg.clone())).collect::<Vec<_>>();
-        assert_eq!(keys(&c.keys), keys(&d.keys));
-        let buttons = |b: &[Button]| b.iter().map(|b| (b.click, b.mask, b.button, b.arg.clone())).collect::<Vec<_>>();
-        assert_eq!(buttons(&c.buttons), buttons(&d.buttons));
+        assert_eq!((c.borderpx, c.snap), (2, 32));
+        assert!(c.showbar && c.topbar);
+        assert_eq!(c.fonts, ["JetBrainsMono Nerd Font:size=11:style=bold"]);
+        assert_eq!(c.colors[SCHEME_NORM], ["#ebdbb2", "#282828", "#282828"]);
+        assert_eq!(c.colors[SCHEME_SEL], ["#ebdbb2", "#282828", "#ebdbb2"]);
+        assert!(!c.resizehints);
+        assert_eq!(c.rules.len(), 8);
+        assert_eq!(c.modkey, xlib::Mod4Mask);
+        let tab = parse_keysym("Tab").unwrap();
+        assert!(c.keys.iter().any(|k| k.keysym == tab && k.mod_ == xlib::Mod1Mask));
+        /* no quit binding: I exit through the powermenu */
+        assert!(!c.keys.iter().any(|k| std::ptr::fn_addr_eq(k.func, Dwm::quit as KeyFn)));
+        let mute = parse_keysym("XF86AudioMute").unwrap();
+        let Some(Arg::V(cmd)) = c.keys.iter().find(|k| k.keysym == mute && k.mod_ == 0).map(|k| &k.arg) else {
+            panic!("XF86AudioMute is not bound to a command");
+        };
+        assert!(cmd.argv[2].ends_with("kill -44 $(pidof dwmblocksr)"));
+        /* every mapping from config.h: STACKKEYS, TAGKEYS (4 keys each) and the rest */
+        assert_eq!(c.keys.len(), 8 + 9 * 4 + 100);
+        assert_eq!(c.buttons.len(), 19);
     }
 
     #[test]

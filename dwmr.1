@@ -345,10 +345,10 @@ The file mirrors dwm's config.def.h: appearance, colors, tags, rules, layouts,
 the modifier key, commands, key bindings and mouse buttons. Every key is
 optional and falls back to the built-in default, which is dwm's default
 configuration. If the file cannot be parsed the error is printed on stderr and
-the defaults are used, so the window manager always starts. A default file is
+the defaults are used, so the window manager always starts. The file shipped as
+config/config.toml in the source tree, the author's own configuration, is
 installed with
-.B make install-config
-and shipped as config/config.toml in the source tree.
+.BR "make install-config" .
 .SS X resources
 After the file, dwmr reads the X resources of the display (the
 .B RESOURCE_MANAGER
