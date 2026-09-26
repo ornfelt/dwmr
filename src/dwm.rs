@@ -1462,6 +1462,7 @@ impl Dwm {
             }
         }
         let Some(c) = found else {
+            self.notifysend("urgent", "no urgent window");
             return;
         };
         let m = self.clients[c].mon;
@@ -3068,6 +3069,14 @@ impl Dwm {
                 }
             }
         }
+        /* sh -c commands tell when the command isn't found (the shell exits
+         * 127); the original command is $0, for the notification */
+        const NOTFOUNDCMD: &str = "\n[ $? -ne 127 ] || notify-send -u critical \"dwmr: command not found\" \"$0\"";
+        if argv.len() == 3 && argv[0] == "/bin/sh" && argv[1] == "-c" {
+            let script = argv[2].clone();
+            argv[2].push_str(NOTFOUNDCMD);
+            argv.push(script);
+        }
         let Ok(cargs) = argv.iter().map(|a| CString::new(a.as_str())).collect::<Result<Vec<_>, _>>() else {
             eprintln!("dwmr: spawn: command contains a NUL byte");
             return;
@@ -3077,6 +3086,17 @@ impl Dwm {
         };
         let mut ptrs: Vec<*const c_char> = cargs.iter().map(|c| c.as_ptr()).collect();
         ptrs.push(ptr::null());
+        /* the notification when execvp fails; the child picks the summary */
+        let notify = ["notify-send", "-u", "critical", "dwmr: command not found", "dwmr: can't run"]
+            .map(|a| CString::new(a).unwrap_or_default());
+        let mut nptrs = [
+            notify[0].as_ptr(),
+            notify[1].as_ptr(),
+            notify[2].as_ptr(),
+            notify[3].as_ptr(),
+            first.as_ptr(),
+            ptr::null(),
+        ];
 
         // SAFETY: after fork() the child only makes async-signal-safe calls
         // (close, setsid, sigaction, execvp) on data prepared before the fork,
@@ -3095,6 +3115,12 @@ impl Dwm {
                 libc::sigaction(libc::SIGCHLD, &sa, ptr::null_mut());
 
                 libc::execvp(first.as_ptr(), ptrs.as_ptr());
+                let err = *libc::__errno_location();
+                if err != libc::ENOENT {
+                    nptrs[3] = notify[4].as_ptr();
+                }
+                libc::execvp(nptrs[0], nptrs.as_ptr());
+                *libc::__errno_location() = err;
                 die(&format!("dwmr: execvp '{}' failed:", argv[0]));
             }
         }
