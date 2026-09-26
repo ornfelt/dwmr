@@ -111,9 +111,7 @@ commands.fileexplorerwdcmd = ["/bin/sh", "-c", "~/.local/bin/my_scripts/file_exp
 commands.powermenucmd      = ["/bin/sh", "-c", "~/.local/bin/my_scripts/sysmenu.sh"]
 commands.screenclipcmd     = ["/bin/sh", "-c", "~/.local/bin/my_scripts/win_screenshot_awsm.sh"]
 commands.ocrcmd            = ["/bin/sh", "-c", "~/.local/bin/my_scripts/tesseract_ocr.sh"]
-commands.roficmd           = ["/bin/sh", "-c", "rofi -show run -theme ~/.config/rofi/themes/gruvbox/gruvbox-dark.rasi"]
-commands.dmenulistcmd      = ["/bin/sh", "-c", "dmenu_run -i -l 20"]
-commands.rofilaunchercmd   = ["/bin/sh", "-c", "rofi -show run -theme ~/.config/polybar/forest/scripts/rofi/launcher.rasi"]
+commands.launchercmd       = ["/bin/sh", "-c", "~/.local/bin/my_scripts/launcher.sh"]
 commands.scriptcopycmd     = ["/bin/sh", "-c", "~/.local/bin/my_scripts/script_copy.sh"]
 commands.scripthelpercmd   = ["/bin/sh", "-c", "~/.local/bin/my_scripts/script_helper.sh wezterm"]
 commands.codenewcmd        = ["/bin/sh", "-c", "~/.local/bin/my_scripts/code_helper.sh new wezterm"]
@@ -319,12 +317,8 @@ keys = [
 	{ mod = "MODKEY|ShiftMask",         key = "s",        func = "spawn",           arg = { v = "screenclipcmd" } },
 	# /* bind mod-ctrl-s: spawn tesseract_ocr.sh */
 	{ mod = "MODKEY|ControlMask",       key = "s",        func = "spawn",           arg = { v = "ocrcmd" } },
-	# /* bind mod-d: spawn rofi */
-	{ mod = "MODKEY",                   key = "d",        func = "spawn",           arg = { v = "roficmd" } },
-	# /* bind mod-r: spawn dmenu_run */
-	{ mod = "MODKEY",                   key = "r",        func = "spawn",           arg = { v = "dmenulistcmd" } },
-	# /* bind mod-shift-r: spawn rofi launcher */
-	{ mod = "MODKEY|ShiftMask",         key = "r",        func = "spawn",           arg = { v = "rofilaunchercmd" } },
+	# /* bind mod-d: spawn launcher.sh (dmenu, or rofi with LAUNCHER=rofi) */
+	{ mod = "MODKEY",                   key = "d",        func = "spawn",           arg = { v = "launchercmd" } },
 	# /* bind mod-t: spawn script_copy.sh */
 	{ mod = "MODKEY",                   key = "t",        func = "spawn",           arg = { v = "scriptcopycmd" } },
 	# /* bind mod-shift-t: spawn script_helper.sh */
