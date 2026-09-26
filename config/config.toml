@@ -164,7 +164,7 @@ statusbar = "dwmblocksr"
 # taken over; here it (re)starts the status bar. [] runs none
 autostart = ["sh", "-c", "killall -q dwmblocksr; dwmblocksr &"]
 
-# There is no quit binding: exit through the powermenu (mod-shift-e).
+# There is no quit binding: mod-shift-e and mod-shift-q open the power menu (sysmenu.sh), which exits.
 keys = [
 	#  modifier                         key               function                  argument
 	# focusstack/pushstack take a stack position (stacker): "INC(n)" is
@@ -315,6 +315,8 @@ keys = [
 	{ mod = "MODKEY",                   key = "e",        func = "spawn",           arg = { v = "fileexplorerwdcmd" } },
 	# /* bind mod-shift-e: spawn sysmenu.sh */
 	{ mod = "MODKEY|ShiftMask",         key = "e",        func = "spawn",           arg = { v = "powermenucmd" } },
+	# /* bind mod-shift-q: spawn sysmenu.sh (quit through the power menu, like awesome) */
+	{ mod = "MODKEY|ShiftMask",         key = "q",        func = "spawn",           arg = { v = "powermenucmd" } },
 	# /* bind mod-shift-s: spawn screenshot to clipboard */
 	{ mod = "MODKEY|ShiftMask",         key = "s",        func = "spawn",           arg = { v = "screenclipcmd" } },
 	# /* bind mod-ctrl-s: spawn tesseract_ocr.sh */
