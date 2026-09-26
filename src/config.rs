@@ -761,6 +761,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "pushstack" => Dwm::pushstack,
         "quit" => Dwm::quit,
         "resizemouse" => Dwm::resizemouse,
+        "setcfact" => Dwm::setcfact,
         "setlayout" => Dwm::setlayout,
         "setmfact" => Dwm::setmfact,
         "shifttag" => Dwm::shifttag,
@@ -1187,7 +1188,7 @@ mod tests {
         };
         assert!(cmd.argv[2].ends_with("kill -44 $(pidof dwmblocksr)"));
         /* every mapping from config.h: STACKKEYS, TAGKEYS (4 keys each) and the rest */
-        assert_eq!(c.keys.len(), 8 + 9 * 4 + 103);
+        assert_eq!(c.keys.len(), 8 + 9 * 4 + 106);
         assert_eq!(c.buttons.len(), 22);
     }
 

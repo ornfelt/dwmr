@@ -166,6 +166,8 @@ pub struct Client {
     pub name: String,
     pub mina: f32,
     pub maxa: f32,
+    /// Weight in its area of the layout (cfacts), see setcfact().
+    pub cfact: f32,
     pub x: i32,
     pub y: i32,
     pub w: i32,
@@ -1821,6 +1823,7 @@ impl Dwm {
             h: wa.height,
             oldh: wa.height,
             oldbw: wa.border_width,
+            cfact: 1.0,
             mon: self.selmon,
             ..Default::default()
         });
@@ -2718,6 +2721,26 @@ impl Dwm {
                 self.setlayout(&Arg::Layout(i));
             }
         }
+    }
+
+    /// cfacts: change the focused client's weight in its area of the layout
+    /// (its height in a column of tile, deck and centeredmaster, its width in
+    /// bstack and centeredfloatingmaster) by arg.f(), within 0.25..=4.0; 0
+    /// sets it back to 1.0.
+    pub fn setcfact(&mut self, arg: &Arg) {
+        let selmon = self.selmon;
+        let Some(c) = self.mons[selmon].sel else {
+            return;
+        };
+        if self.arrange_fn(selmon).is_none() {
+            return;
+        }
+        let f = if arg.f() == 0.0 { 1.0 } else { arg.f() + self.clients[c].cfact };
+        if !(0.25..=4.0).contains(&f) {
+            return;
+        }
+        self.clients[c].cfact = f;
+        self.arrange(Some(selmon));
     }
 
     pub fn setlayout(&mut self, arg: &Arg) {

@@ -80,12 +80,12 @@ A few notes on the format:
   all tags, counts as odd. Pressing the key of the current tag returns to the
   previous tag only with one monitor.
 - Functions: spawn, togglebar, focusstack, focusurgent, pushstack, incnmaster,
-  setmfact, zoom, view, killclient, setlayout, cyclelayout, layoutmenu,
-  togglefloating, togglefullscr, togglesticky, togglescratch, tag, tagview,
-  focusmon, focusnthmon, tagmon, tagmonview, tagnthmonview, togglebars,
-  toggleview, toggletag, shifttag, shiftview, shiftviewclients, defaultgaps,
-  incrgaps, togglegaps, togglebgaps, sigstatusbar, quit, movemouse,
-  resizemouse.
+  setmfact, setcfact, zoom, view, killclient, setlayout, cyclelayout,
+  layoutmenu, togglefloating, togglefullscr, togglesticky, togglescratch, tag,
+  tagview, focusmon, focusnthmon, tagmon, tagmonview, tagnthmonview,
+  togglebars, toggleview, toggletag, shifttag, shiftview, shiftviewclients,
+  defaultgaps, incrgaps, togglegaps, togglebgaps, sigstatusbar, quit,
+  movemouse, resizemouse.
   Layouts: spiral, tile, bstack, dwindle, deck, monocle, centeredmaster,
   centeredfloatingmaster, none.
 - `tagmonview` sends the focused window to the previous/next monitor like
@@ -154,16 +154,18 @@ A few notes on the format:
 - The tiled layouts (spiral, tile, bstack, dwindle, deck, centeredmaster,
   centeredfloatingmaster) leave gaps between windows (`gappih`, `gappiv`) and
   at the screen edge (`gappoh`, `gappov`), 20 pixels each by default, at most
-  1000 (dwm's vanitygaps patch, without cfacts: windows in an area share it
-  evenly). `smartgaps = true` drops the outer gaps for a single window. A
-  single Firefox window (class starting with "firefox", any case) gets no
-  outer gaps unless `browsergaps = true`. `incrgaps` with `{ i = n }` changes
-  all gaps of the selected monitor by `n`, `defaultgaps` resets them,
-  `togglegaps` turns gaps off and on and `togglebgaps` toggles `browsergaps`.
-  Bound to Mod1-plus/minus (3 px), Mod1-Shift-plus/minus (1 px), Mod1-x,
-  Mod1-z and Mod1-Control-z, and Mod1-Button2/4/5 on a window (defaultgaps,
-  +1, -1), which replaces dwm's Mod1-Button2 togglefloating. The default
-  layout is spiral; Mod1-t/f/m still select tile, floating and monocle.
+  1000 (dwm's cfacts-vanitygaps patch: windows in an area share it by their
+  weight, 1.0 unless `setcfact` with `{ f = n }` changes the focused one's by
+  `n`, within 0.25 to 4.0; `{ f = 0.0 }` resets it). `smartgaps = true` drops
+  the outer gaps for a single window. A single Firefox window (class starting
+  with "firefox", any case) gets no outer gaps unless `browsergaps = true`.
+  `incrgaps` with `{ i = n }` changes all gaps of the selected monitor by `n`,
+  `defaultgaps` resets them, `togglegaps` turns gaps off and on and
+  `togglebgaps` toggles `browsergaps`. Bound to Mod1-plus/minus (3 px),
+  Mod1-Shift-plus/minus (1 px), Mod1-x, Mod1-z and Mod1-Control-z, and
+  Mod1-Button2/4/5 on a window (defaultgaps, +1, -1), which replaces dwm's
+  Mod1-Button2 togglefloating. The default layout is spiral; Mod1-t/f/m still
+  select tile, floating and monocle.
 - Setting only `modkey` rebinds the default keys and buttons to it.
 - The bar shows no window title and has no title click area (dwm's notitle
   patch); `ClkWinTitle` is not a valid click.

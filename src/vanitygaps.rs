@@ -3,13 +3,13 @@
 //! and the screen edge, and the gap-aware layouts. It is a child module of
 //! dwm.rs (like `#include "vanitygaps.c"`), so it adds methods to `Dwm`.
 //!
-//! cfacts is not ported: every client has the weight 1, so getfacts() splits
-//! an area evenly.
+//! cfacts: every client has a weight (cfact, 1.0 unless setcfact() changes
+//! it), and the clients in an area of a layout share it by weight.
 
 use crate::config::Arg;
 use crate::util::truncate_utf8;
 
-use super::{height, width, Dwm, MonId, LTSYMBOL_SIZE};
+use super::{height, width, ClientId, Dwm, MonId, LTSYMBOL_SIZE};
 
 /// The largest gap setgaps() stores and the config accepts. Not in the patch:
 /// it keeps the gap arithmetic in the layouts far from overflowing.
@@ -95,33 +95,52 @@ impl Dwm {
         )
     }
 
-    /// `getfacts(m, msize, ssize, &mf, &sf, &mr, &sr)` without cfacts: every
-    /// client weighs 1, so each master client gets `msize / mfacts` and each
-    /// stack client `ssize / sfacts`. Returns those shares instead of the
-    /// facts (so the layouts never divide), plus the remainders.
-    fn getfacts(&self, m: MonId, msize: i32, ssize: i32) -> (i32, i32, i32, i32) {
+    /// The size of client `c` in an area of size `total` shared by clients
+    /// whose weights add up to `facts` (so facts > 0). The patch computes
+    /// total * (c->cfact / facts); dividing last keeps equal weights at
+    /// exactly total / n.
+    fn cfactsize(&self, c: ClientId, total: i32, facts: f32) -> i32 {
+        (total as f32 * self.clients[c].cfact / facts) as i32
+    }
+
+    /// `getfacts(m, msize, ssize, &mf, &sf, &mr, &sr)` of the cfacts patch:
+    /// the total weight of the master and of the stack clients, and the
+    /// pixels left after each client got its cfactsize() (the first ones get
+    /// one more).
+    fn getfacts(&self, m: MonId, msize: i32, ssize: i32) -> (f32, f32, i32, i32) {
         let nmaster = self.mons[m].nmaster;
-        let (mut mfacts, mut sfacts) = (0, 0);
+        let (mut mfacts, mut sfacts) = (0.0, 0.0);
 
         let mut n = 0;
         let mut c = self.nexttiled(self.mons[m].clients);
         while let Some(i) = c {
             if n < nmaster {
-                mfacts += 1;
+                mfacts += self.clients[i].cfact;
             } else {
-                sfacts += 1;
+                sfacts += self.clients[i].cfact;
             }
             c = self.nexttiled(self.clients[i].next);
             n += 1;
         }
 
-        let mf = if mfacts > 0 { msize / mfacts } else { 0 }; // size of a master client
-        let sf = if sfacts > 0 { ssize / sfacts } else { 0 }; // size of a stack client
+        let (mut mtotal, mut stotal) = (0, 0);
+        let mut n = 0;
+        let mut c = self.nexttiled(self.mons[m].clients);
+        while let Some(i) = c {
+            if n < nmaster {
+                mtotal += self.cfactsize(i, msize, mfacts);
+            } else {
+                stotal += self.cfactsize(i, ssize, sfacts);
+            }
+            c = self.nexttiled(self.clients[i].next);
+            n += 1;
+        }
+
         (
-            mf,
-            sf,
-            msize - mf * mfacts, // the remainder (rest) of pixels after a master split
-            ssize - sf * sfacts, // the remainder (rest) of pixels after a stack split
+            mfacts,          // total factor of master area
+            sfacts,          // total factor of stack area
+            msize - mtotal, // the remainder (rest) of pixels after a cfacts master split
+            ssize - stotal, // the remainder (rest) of pixels after a cfacts stack split
         )
     }
 
@@ -170,10 +189,10 @@ impl Dwm {
         while let Some(k) = c {
             let bw = self.clients[k].bw;
             if i < nmaster {
-                self.resize(k, mx, my, mf + (i < mrest) as i32 - (2 * bw), mh - (2 * bw), false);
+                self.resize(k, mx, my, self.cfactsize(k, mw, mf) + (i < mrest) as i32 - (2 * bw), mh - (2 * bw), false);
                 mx += width(&self.clients[k]) + iv;
             } else {
-                self.resize(k, sx, sy, sf + ((i - nmaster) < srest) as i32 - (2 * bw), sh - (2 * bw), false);
+                self.resize(k, sx, sy, self.cfactsize(k, sw, sf) + ((i - nmaster) < srest) as i32 - (2 * bw), sh - (2 * bw), false);
                 sx += width(&self.clients[k]) + iv;
             }
             c = self.nexttiled(self.clients[k].next);
@@ -223,28 +242,39 @@ impl Dwm {
             ry = wy + oh;
         }
 
-        /* calculate facts: every client weighs 1 */
-        let (mut mfacts, mut lfacts, mut rfacts) = (0, 0, 0);
+        /* calculate facts */
+        let (mut mfacts, mut lfacts, mut rfacts) = (0.0, 0.0, 0.0);
         let mut k = 0;
         let mut c = self.nexttiled(self.mons[m].clients);
         while let Some(i) = c {
             if nmaster == 0 || k < nmaster {
-                mfacts += 1;
+                mfacts += self.clients[i].cfact;
             } else if (k - nmaster) % 2 != 0 {
-                lfacts += 1; // total factor of left hand stack area
+                lfacts += self.clients[i].cfact; // total factor of left hand stack area
             } else {
-                rfacts += 1; // total factor of right hand stack area
+                rfacts += self.clients[i].cfact; // total factor of right hand stack area
             }
             c = self.nexttiled(self.clients[i].next);
             k += 1;
         }
 
-        let mf = if mfacts > 0 { mh / mfacts } else { 0 };
-        let lf = if lfacts > 0 { lh / lfacts } else { 0 };
-        let rf = if rfacts > 0 { rh / rfacts } else { 0 };
-        let mrest = mh - mf * mfacts;
-        let lrest = lh - lf * lfacts;
-        let rrest = rh - rf * rfacts;
+        let (mut mtotal, mut ltotal, mut rtotal) = (0, 0, 0);
+        let mut k = 0;
+        let mut c = self.nexttiled(self.mons[m].clients);
+        while let Some(i) = c {
+            if nmaster == 0 || k < nmaster {
+                mtotal += self.cfactsize(i, mh, mfacts);
+            } else if (k - nmaster) % 2 != 0 {
+                ltotal += self.cfactsize(i, lh, lfacts);
+            } else {
+                rtotal += self.cfactsize(i, rh, rfacts);
+            }
+            c = self.nexttiled(self.clients[i].next);
+            k += 1;
+        }
+        let mrest = mh - mtotal;
+        let lrest = lh - ltotal;
+        let rrest = rh - rtotal;
 
         let mut i = 0;
         let mut c = self.nexttiled(self.mons[m].clients);
@@ -252,7 +282,7 @@ impl Dwm {
             let bw = self.clients[k].bw;
             if nmaster == 0 || i < nmaster {
                 /* nmaster clients are stacked vertically, in the center of the screen */
-                self.resize(k, mx, my, mw - (2 * bw), mf + (i < mrest) as i32 - (2 * bw), false);
+                self.resize(k, mx, my, mw - (2 * bw), self.cfactsize(k, mh, mfacts) + (i < mrest) as i32 - (2 * bw), false);
                 my += height(&self.clients[k]) + ih;
             } else {
                 /* stack clients are stacked vertically; the patch tests
@@ -261,10 +291,10 @@ impl Dwm {
                  * nmaster > 2, so the first rest clients of each side get one
                  * pixel more here: (i - nmaster) / 2 is the index on its side */
                 if (i - nmaster) % 2 != 0 {
-                    self.resize(k, lx, ly, lw - (2 * bw), lf + ((i - nmaster) / 2 < lrest) as i32 - (2 * bw), false);
+                    self.resize(k, lx, ly, lw - (2 * bw), self.cfactsize(k, lh, lfacts) + ((i - nmaster) / 2 < lrest) as i32 - (2 * bw), false);
                     ly += height(&self.clients[k]) + ih;
                 } else {
-                    self.resize(k, rx, ry, rw - (2 * bw), rf + ((i - nmaster) / 2 < rrest) as i32 - (2 * bw), false);
+                    self.resize(k, rx, ry, rw - (2 * bw), self.cfactsize(k, rh, rfacts) + ((i - nmaster) / 2 < rrest) as i32 - (2 * bw), false);
                     ry += height(&self.clients[k]) + ih;
                 }
             }
@@ -315,11 +345,11 @@ impl Dwm {
             let bw = self.clients[k].bw;
             if i < nmaster {
                 /* nmaster clients are stacked horizontally, in the center of the screen */
-                self.resize(k, mx, my, mf + (i < mrest) as i32 - (2 * bw), mh - (2 * bw), false);
+                self.resize(k, mx, my, self.cfactsize(k, mw, mf) + (i < mrest) as i32 - (2 * bw), mh - (2 * bw), false);
                 mx = (mx as f32 + (width(&self.clients[k]) as f32 + iv as f32 * mivf)) as i32;
             } else {
                 /* stack clients are stacked horizontally */
-                self.resize(k, sx, sy, sf + ((i - nmaster) < srest) as i32 - (2 * bw), sh - (2 * bw), false);
+                self.resize(k, sx, sy, self.cfactsize(k, sw, sf) + ((i - nmaster) < srest) as i32 - (2 * bw), sh - (2 * bw), false);
                 sx += width(&self.clients[k]) + iv;
             }
             c = self.nexttiled(self.clients[k].next);
@@ -367,7 +397,7 @@ impl Dwm {
         while let Some(k) = c {
             let bw = self.clients[k].bw;
             if i < nmaster {
-                self.resize(k, mx, my, mw - (2 * bw), mf + (i < mrest) as i32 - (2 * bw), false);
+                self.resize(k, mx, my, mw - (2 * bw), self.cfactsize(k, mh, mf) + (i < mrest) as i32 - (2 * bw), false);
                 my += height(&self.clients[k]) + ih;
             } else {
                 self.resize(k, sx, sy, sw - (2 * bw), sh - (2 * bw), false);
@@ -505,10 +535,10 @@ impl Dwm {
         while let Some(k) = c {
             let bw = self.clients[k].bw;
             if i < nmaster {
-                self.resize(k, mx, my, mw - (2 * bw), mf + (i < mrest) as i32 - (2 * bw), false);
+                self.resize(k, mx, my, mw - (2 * bw), self.cfactsize(k, mh, mf) + (i < mrest) as i32 - (2 * bw), false);
                 my += height(&self.clients[k]) + ih;
             } else {
-                self.resize(k, sx, sy, sw - (2 * bw), sf + ((i - nmaster) < srest) as i32 - (2 * bw), false);
+                self.resize(k, sx, sy, sw - (2 * bw), self.cfactsize(k, sh, sf) + ((i - nmaster) < srest) as i32 - (2 * bw), false);
                 sy += height(&self.clients[k]) + ih;
             }
             c = self.nexttiled(self.clients[k].next);
