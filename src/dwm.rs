@@ -33,7 +33,9 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::mem;
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::process::CommandExt;
 use std::os::raw::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong};
+use std::process::Stdio;
 use std::ptr;
 use std::rc::Rc;
 use std::sync::OnceLock;
@@ -2630,6 +2632,66 @@ impl Dwm {
             self.updatenetwmstate(c);
             let m = self.clients[c].mon;
             self.arrange(Some(m));
+        }
+    }
+
+    /// Set the layout `arg.i` places after the current one in `layouts`,
+    /// wrapping around (dwm's cyclelayouts patch).
+    pub fn cyclelayout(&mut self, arg: &Arg) {
+        let n = self.layouts.len() as i32;
+        let mon = &self.mons[self.selmon];
+        let i = mon.lt[mon.sellt] as i32;
+        self.setlayout(&Arg::Layout((i + arg.i()).rem_euclid(n) as usize));
+    }
+
+    /// Run the command `arg.v`, which prints the index in `layouts` of the
+    /// layout to set, with the current one's index in LAYOUT_MENU_CURRENT
+    /// (dwm's layoutmenu patch). dwmr waits for it to exit, like for a menu.
+    pub fn layoutmenu(&mut self, arg: &Arg) {
+        let Arg::V(cmd) = arg else {
+            return;
+        };
+        let Some((prog, args)) = cmd.argv.split_first() else {
+            return;
+        };
+        let mon = &self.mons[self.selmon];
+        let mut menu = std::process::Command::new(prog);
+        menu.args(args).env("LAYOUT_MENU_CURRENT", mon.lt[mon.sellt].to_string()).stdout(Stdio::piped());
+        // SAFETY: XConnectionNumber only reads the fd of the open display.
+        let xfd = if self.dpy.is_null() { -1 } else { unsafe { XConnectionNumber(self.dpy) } };
+        // SAFETY: the hook runs in the child between fork() and exec() and
+        // only makes async-signal-safe calls (close, sigaction), like spawn().
+        unsafe {
+            menu.pre_exec(move || {
+                if xfd >= 0 {
+                    libc::close(xfd);
+                }
+                /* the command must not inherit dwmr's ignored SIGCHLD */
+                let mut sa: libc::sigaction = mem::zeroed();
+                libc::sigemptyset(&mut sa.sa_mask);
+                sa.sa_flags = 0;
+                sa.sa_sigaction = libc::SIG_DFL;
+                libc::sigaction(libc::SIGCHLD, &sa, ptr::null_mut());
+                Ok(())
+            });
+        }
+        let mut child = match menu.spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                eprintln!("dwmr: layoutmenu: '{}' failed: {}", prog, e);
+                return;
+            }
+        };
+        let mut out = String::new();
+        if let Some(mut stdout) = child.stdout.take() {
+            let _ = stdout.read_to_string(&mut out);
+        }
+        /* SIGCHLD is ignored: this waits for the exit, then fails with ECHILD */
+        let _ = child.wait();
+        if let Ok(i) = out.trim().parse::<usize>() {
+            if i < self.layouts.len() {
+                self.setlayout(&Arg::Layout(i));
+            }
         }
     }
 

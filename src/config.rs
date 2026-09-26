@@ -744,6 +744,7 @@ fn parse_keysym(s: &str) -> Result<KeySym, ConfigError> {
 
 fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
     Ok(match name.trim() {
+        "cyclelayout" => Dwm::cyclelayout,
         "defaultgaps" => Dwm::defaultgaps,
         "focusmon" => Dwm::focusmon,
         "focusnthmon" => Dwm::focusnthmon,
@@ -752,6 +753,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "incnmaster" => Dwm::incnmaster,
         "incrgaps" => Dwm::incrgaps,
         "killclient" => Dwm::killclient,
+        "layoutmenu" => Dwm::layoutmenu,
         "movemouse" => Dwm::movemouse,
         "pushstack" => Dwm::pushstack,
         "quit" => Dwm::quit,
@@ -1178,8 +1180,8 @@ mod tests {
         };
         assert!(cmd.argv[2].ends_with("kill -44 $(pidof dwmblocksr)"));
         /* every mapping from config.h: STACKKEYS, TAGKEYS (4 keys each) and the rest */
-        assert_eq!(c.keys.len(), 8 + 9 * 4 + 100);
-        assert_eq!(c.buttons.len(), 19);
+        assert_eq!(c.keys.len(), 8 + 9 * 4 + 101);
+        assert_eq!(c.buttons.len(), 22);
     }
 
     #[test]

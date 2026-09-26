@@ -80,11 +80,12 @@ A few notes on the format:
   all tags, counts as odd. Pressing the key of the current tag returns to the
   previous tag only with one monitor.
 - Functions: spawn, togglebar, focusstack, focusurgent, pushstack, incnmaster,
-  setmfact, zoom, view, killclient, setlayout, togglefloating, togglefullscr,
-  togglesticky, togglescratch, tag, tagview, focusmon, focusnthmon, tagmon,
-  tagmonview, tagnthmonview, togglebars, toggleview, toggletag, shifttag,
-  shiftview, shiftviewclients, defaultgaps, incrgaps, togglegaps, togglebgaps,
-  sigstatusbar, quit, movemouse, resizemouse.
+  setmfact, zoom, view, killclient, setlayout, cyclelayout, layoutmenu,
+  togglefloating, togglefullscr, togglesticky, togglescratch, tag, tagview,
+  focusmon, focusnthmon, tagmon, tagmonview, tagnthmonview, togglebars,
+  toggleview, toggletag, shifttag, shiftview, shiftviewclients, defaultgaps,
+  incrgaps, togglegaps, togglebgaps, sigstatusbar, quit, movemouse,
+  resizemouse.
   Layouts: spiral, tile, bstack, dwindle, deck, monocle, centeredmaster,
   centeredfloatingmaster, none.
 - `tagmonview` sends the focused window to the previous/next monitor like
@@ -93,6 +94,14 @@ A few notes on the format:
   `tagmonview` for monitor number `{ i = n }` (0 is the first; a number past
   the end means the last). `togglebars` toggles the bar on every monitor at
   once, `togglebar` only on the focused one.
+- `cyclelayout` sets the layout `{ i = n }` places after the current one in
+  `layouts`, wrapping around (dwm's cyclelayouts patch). `layoutmenu` runs a
+  command, `{ v = "layoutmenucmd" }`, that prints the index in `layouts` of
+  the layout to set, with the current layout's index in
+  `LAYOUT_MENU_CURRENT`, and waits for it like for a menu (dwm's layoutmenu
+  patch). cyclelayout is bound to the mouse wheel on the layout symbol,
+  layoutmenu to a click on it and to Mod-r; my layoutmenucmd is
+  `layout_menu.sh`, a rofi grid with an ascii preview of each layout.
 - `scratchpads` is a list of `{ name, cmd }` (dwm's scratchpads patch). Each
   scratchpad owns a tag bit above the normal tags, written `"SPTAG(0)"`,
   `"SPTAG(1)"`, ... in a rule's `tags`; the tags and the scratchpads together
