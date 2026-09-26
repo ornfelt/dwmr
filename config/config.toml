@@ -228,8 +228,8 @@ keys = [
 	{ mod = "MODKEY|ControlMask",       key = "i",        func = "setlayout",       arg = { v = "layouts[5]" } },
 	# /* bind mod-ctrl-o: setlayout centeredmaster */
 	{ mod = "MODKEY|ControlMask",       key = "o",        func = "setlayout",       arg = { v = "layouts[6]" } },
-	# /* bind mod-ctrl-p: setlayout centeredfloatingmaster */
-	{ mod = "MODKEY|ControlMask",       key = "p",        func = "setlayout",       arg = { v = "layouts[7]" } },
+	# /* bind mod-alt-p: setlayout centeredfloatingmaster */
+	{ mod = "MODKEY|Mod1Mask",          key = "p",        func = "setlayout",       arg = { v = "layouts[7]" } },
 	# /* bind mod-ctrl-aring: setlayout floating */
 	{ mod = "MODKEY|ControlMask",       key = "aring",    func = "setlayout",       arg = { v = "layouts[8]" } },
 	# /* bind mod-f: togglefullscr */
