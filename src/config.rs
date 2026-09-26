@@ -1187,7 +1187,7 @@ mod tests {
         };
         assert!(cmd.argv[2].ends_with("kill -44 $(pidof dwmblocksr)"));
         /* every mapping from config.h: STACKKEYS, TAGKEYS (4 keys each) and the rest */
-        assert_eq!(c.keys.len(), 8 + 9 * 4 + 102);
+        assert_eq!(c.keys.len(), 8 + 9 * 4 + 105);
         assert_eq!(c.buttons.len(), 22);
     }
 

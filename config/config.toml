@@ -141,6 +141,9 @@ commands.emojipickcmd      = ["/bin/sh", "-c", "~/.local/bin/my_scripts/emojipic
 commands.tmuxattachcmd     = ["/bin/sh", "-c", "~/.local/bin/my_scripts/tmux_attach.sh wezterm"]
 commands.transdeccmd       = ["/bin/sh", "-c", "~/.local/bin/my_scripts/picom_trans.sh -5"]
 commands.transinccmd       = ["/bin/sh", "-c", "~/.local/bin/my_scripts/picom_trans.sh +5"]
+commands.transresetcmd      = ["/bin/sh", "-c", "~/.local/bin/my_scripts/picom_trans.sh --reset"]
+commands.transalldeccmd     = ["/bin/sh", "-c", "~/.local/bin/my_scripts/picom_trans.sh --all -5"]
+commands.transallinccmd     = ["/bin/sh", "-c", "~/.local/bin/my_scripts/picom_trans.sh --all +5"]
 commands.ewwcmd            = ["/bin/sh", "-c", "~/.local/bin/my_scripts/loadEww.sh"]
 commands.termwdcmd         = ["/bin/sh", "-c", "~/.local/bin/my_scripts/term_wd.sh wezterm"]
 commands.sectermwdcmd      = ["/bin/sh", "-c", "~/.local/bin/my_scripts/term_wd.sh st"]
@@ -388,6 +391,12 @@ keys = [
 	{ mod = "MODKEY|ShiftMask",         key = "a",        func = "spawn",           arg = { v = "transdeccmd" } },
 	# /* bind mod-ctrl-a: spawn picom_trans.sh +5 (increase transparency) */
 	{ mod = "MODKEY|ControlMask",       key = "a",        func = "spawn",           arg = { v = "transinccmd" } },
+	# /* bind mod-alt-a: spawn picom_trans.sh --reset (all windows back to picom.conf) */
+	{ mod = "MODKEY|Mod1Mask",          key = "a",        func = "spawn",           arg = { v = "transresetcmd" } },
+	# /* bind mod-alt-shift-a: spawn picom_trans.sh --all -5 (all windows more transparent) */
+	{ mod = "MODKEY|Mod1Mask|ShiftMask", key = "a",        func = "spawn",           arg = { v = "transalldeccmd" } },
+	# /* bind mod-alt-ctrl-a: spawn picom_trans.sh --all +5 (all windows more opaque) */
+	{ mod = "MODKEY|Mod1Mask|ControlMask", key = "a",      func = "spawn",           arg = { v = "transallinccmd" } },
 	# /* bind mod-section: spawn loadEww.sh */
 	{ mod = "MODKEY",                   key = "section",  func = "spawn",           arg = { v = "ewwcmd" } },
 	# /* bind mod-return: spawn term_wd.sh */
