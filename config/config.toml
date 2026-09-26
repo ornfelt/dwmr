@@ -268,6 +268,8 @@ keys = [
 	{ mod = "Mod1Mask|ShiftMask",       key = "Tab",      func = "shiftviewclients", arg = { i = -1 } },
 	# /* bind mod-q: killclient */
 	{ mod = "MODKEY",                   key = "q",        func = "killclient" },
+	# /* bind mod-u: focusurgent (jump to urgent window) */
+	{ mod = "MODKEY",                   key = "u",        func = "focusurgent" },
 	# togglebars toggles the bar on every monitor, togglebar on the focused one
 	# /* bind mod-shift-p: togglebars */
 	{ mod = "MODKEY|ShiftMask",         key = "p",        func = "togglebars" },

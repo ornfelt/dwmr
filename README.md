@@ -79,12 +79,12 @@ A few notes on the format:
   over the windows that have only even tags. A mask with any odd tag, like
   all tags, counts as odd. Pressing the key of the current tag returns to the
   previous tag only with one monitor.
-- Functions: spawn, togglebar, focusstack, pushstack, incnmaster, setmfact,
-  zoom, view, killclient, setlayout, togglefloating, togglefullscr,
+- Functions: spawn, togglebar, focusstack, focusurgent, pushstack, incnmaster,
+  setmfact, zoom, view, killclient, setlayout, togglefloating, togglefullscr,
   togglesticky, togglescratch, tag, tagview, focusmon, focusnthmon, tagmon,
   tagmonview, tagnthmonview, togglebars, toggleview, toggletag, shifttag,
-  shiftview, shiftviewclients, defaultgaps, incrgaps, togglegaps,
-  togglebgaps, sigstatusbar, quit, movemouse, resizemouse.
+  shiftview, shiftviewclients, defaultgaps, incrgaps, togglegaps, togglebgaps,
+  sigstatusbar, quit, movemouse, resizemouse.
   Layouts: spiral, tile, bstack, dwindle, deck, monocle, centeredmaster,
   centeredfloatingmaster, none.
 - `tagmonview` sends the focused window to the previous/next monitor like

@@ -1427,6 +1427,46 @@ impl Dwm {
         self.focus(None);
     }
 
+    /// Jump to the first urgent client on any monitor: view its tag on its
+    /// own monitor and focus it. The tagset is set here instead of calling
+    /// view(), whose odd/even split would pick the monitor from the tag, not
+    /// the client.
+    pub fn focusurgent(&mut self, _arg: &Arg) {
+        let tagbits = self.tagbits();
+        let mut found = None;
+        'mons: for m in 0..self.mons.len() {
+            let mut c = self.mons[m].clients;
+            while let Some(i) = c {
+                if self.clients[i].isurgent && self.clients[i].tags & tagbits != 0 {
+                    found = Some(i);
+                    break 'mons;
+                }
+                c = self.clients[i].next;
+            }
+        }
+        let Some(c) = found else {
+            return;
+        };
+        let m = self.clients[c].mon;
+        if m != self.selmon {
+            let sel = self.mons[self.selmon].sel;
+            self.unfocus(sel, false);
+            let mon = &self.mons[m];
+            // SAFETY: root is a valid window; the pointer goes to the centre of the monitor's window area.
+            unsafe { XWarpPointer(self.dpy, 0, self.root, 0, 0, 0, 0, mon.wx + mon.ww / 2, mon.wy + mon.wh / 2) };
+            self.selmon = m;
+        }
+        if !self.isvisible(c) {
+            let tags = self.clients[c].tags & tagbits;
+            self.mons[m].seltags ^= 1;
+            let seltags = self.mons[m].seltags;
+            self.mons[m].tagset[seltags] = tags & tags.wrapping_neg(); /* lowest tag */
+            self.arrange(Some(m));
+        }
+        self.focus(Some(c));
+        self.restack(m); /* also drops the EnterNotify from the pointer warp */
+    }
+
     pub fn focusstack(&mut self, arg: &Arg) {
         let selmon = self.selmon;
         let mut i = self.stackpos(arg);

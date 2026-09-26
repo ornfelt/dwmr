@@ -748,6 +748,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "focusmon" => Dwm::focusmon,
         "focusnthmon" => Dwm::focusnthmon,
         "focusstack" => Dwm::focusstack,
+        "focusurgent" => Dwm::focusurgent,
         "incnmaster" => Dwm::incnmaster,
         "incrgaps" => Dwm::incrgaps,
         "killclient" => Dwm::killclient,
@@ -1177,7 +1178,7 @@ mod tests {
         };
         assert!(cmd.argv[2].ends_with("kill -44 $(pidof dwmblocksr)"));
         /* every mapping from config.h: STACKKEYS, TAGKEYS (4 keys each) and the rest */
-        assert_eq!(c.keys.len(), 8 + 9 * 4 + 98);
+        assert_eq!(c.keys.len(), 8 + 9 * 4 + 99);
         assert_eq!(c.buttons.len(), 19);
     }
 
