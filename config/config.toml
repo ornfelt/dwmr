@@ -86,7 +86,7 @@ refreshrate = 120     # refresh rate (per second) for client move/resize
 
 layouts = [
 	#  symbol          arrange function
-	{ symbol = "[φ]",  arrange = "spiral" },                 # Default: Fibonacci spiral
+	{ symbol = "[Φ]",  arrange = "spiral" },                 # Default: Fibonacci spiral
 	{ symbol = "[]=",  arrange = "tile" },                   # Master on left, slaves on right
 	{ symbol = "TTT",  arrange = "bstack" },                 # Master on top, slaves on bottom
 	{ symbol = "[\\]", arrange = "dwindle" },                # Decreasing in size right and leftward
