@@ -178,6 +178,7 @@ pub struct Config {
     pub mfact: f32,           /* factor of master area size [0.05..0.95] */
     pub nmaster: i32,         /* number of clients in master area */
     pub resizehints: bool,    /* true means respect size hints in tiled resizals */
+    pub layoutalltags: bool,  /* true: setlayout sets every tag's (and monitor's) layout, false: each tag has its own */
     pub lockfullscreen: bool, /* true will force focus on the fullscreen window */
     pub refreshrate: u32,     /* refresh rate (per second) for client move/resize */
     pub layouts: Vec<Layout>,
@@ -397,6 +398,7 @@ impl Default for Config {
             mfact: 0.55,
             nmaster: 1,
             resizehints: true,
+            layoutalltags: true,
             lockfullscreen: true,
             refreshrate: 120,
             layouts,
@@ -492,6 +494,7 @@ struct RawConfig {
     mfact: Option<f32>,
     nmaster: Option<i32>,
     resizehints: Option<bool>,
+    layoutalltags: Option<bool>,
     lockfullscreen: Option<bool>,
     refreshrate: Option<u32>,
     layouts: Option<Vec<RawLayout>>,
@@ -774,6 +777,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "togglebars" => Dwm::togglebars,
         "togglebgaps" => Dwm::togglebgaps,
         "togglefloating" => Dwm::togglefloating,
+        "togglelayoutalltags" => Dwm::togglelayoutalltags,
         "togglefullscr" => Dwm::togglefullscr,
         "togglegaps" => Dwm::togglegaps,
         "togglescratch" => Dwm::togglescratch,
@@ -993,6 +997,9 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
     if let Some(v) = raw.resizehints {
         config.resizehints = v;
     }
+    if let Some(v) = raw.layoutalltags {
+        config.layoutalltags = v;
+    }
     if let Some(v) = raw.lockfullscreen {
         config.lockfullscreen = v;
     }
@@ -1180,7 +1187,7 @@ mod tests {
         };
         assert!(cmd.argv[2].ends_with("kill -44 $(pidof dwmblocksr)"));
         /* every mapping from config.h: STACKKEYS, TAGKEYS (4 keys each) and the rest */
-        assert_eq!(c.keys.len(), 8 + 9 * 4 + 101);
+        assert_eq!(c.keys.len(), 8 + 9 * 4 + 102);
         assert_eq!(c.buttons.len(), 22);
     }
 

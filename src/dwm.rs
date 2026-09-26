@@ -320,6 +320,11 @@ pub struct Dwm {
     wmatom: [Atom; WM_LAST],
     netatom: [Atom; NET_LAST],
     running: bool,
+    /// setlayout sets every tag's (and monitor's) layout; togglelayoutalltags
+    /// flips it (config.layoutalltags at startup).
+    layoutalltags: bool,
+    /// The index in layouts of each tag's layout, used when !layoutalltags.
+    taglayouts: Vec<usize>,
     cursor: [Cur; CUR_LAST],
     scheme: Vec<Vec<Clr>>,
     dpy: *mut Display,
@@ -378,6 +383,8 @@ impl Dwm {
         Dwm {
             layouts: config.layouts.clone(),
             browsergaps: config.browsergaps,
+            layoutalltags: config.layoutalltags,
+            taglayouts: vec![0; config.tags.len()],
             config: Rc::new(config),
             stext: String::new(),
             statusw: 0,
@@ -675,6 +682,14 @@ impl Dwm {
     }
 
     fn arrangemon(&mut self, m: MonId) {
+        /* a layout per tag: the one of the first viewed tag */
+        if !self.layoutalltags && self.running {
+            let tagset = self.mons[m].tagset[self.mons[m].seltags];
+            if let Some(i) = (0..self.taglayouts.len()).find(|i| tagset & 1 << i != 0) {
+                let sellt = self.mons[m].sellt;
+                self.mons[m].lt[sellt] = self.taglayouts[i];
+            }
+        }
         let mut symbol = self.lt_symbol(m).to_string();
         truncate_utf8(&mut symbol, LTSYMBOL_SIZE - 1);
         self.mons[m].ltsymbol = symbol;
@@ -2709,6 +2724,23 @@ impl Dwm {
             let sellt = self.mons[selmon].sellt;
             self.mons[selmon].lt[sellt] = i;
         }
+        /* every tag and monitor takes it (layoutalltags), else the viewed tags */
+        let lt = self.mons[selmon].lt[self.mons[selmon].sellt];
+        let tagset = self.mons[selmon].tagset[self.mons[selmon].seltags];
+        for (i, t) in self.taglayouts.iter_mut().enumerate() {
+            if self.layoutalltags || tagset & 1 << i != 0 {
+                *t = lt;
+            }
+        }
+        if self.layoutalltags {
+            for m in 0..self.mons.len() {
+                if m != selmon {
+                    let sellt = self.mons[m].sellt;
+                    self.mons[m].lt[sellt] = lt;
+                    self.arrange(Some(m));
+                }
+            }
+        }
         let mut symbol = self.lt_symbol(selmon).to_string();
         truncate_utf8(&mut symbol, LTSYMBOL_SIZE - 1);
         self.mons[selmon].ltsymbol = symbol;
@@ -3282,6 +3314,20 @@ impl Dwm {
             unsafe { XMoveResizeWindow(self.dpy, mon.barwin, mon.wx, mon.by, mon.ww as c_uint, self.bh as c_uint) };
             self.arrange(Some(m));
         }
+    }
+
+    /// Toggle between one layout for every tag and monitor and a layout per
+    /// tag (layoutalltags).
+    pub fn togglelayoutalltags(&mut self, _arg: &Arg) {
+        self.layoutalltags = !self.layoutalltags;
+        if self.layoutalltags {
+            /* every tag takes the current layout */
+            let lt = self.mons[self.selmon].lt[self.mons[self.selmon].sellt];
+            self.setlayout(&Arg::Layout(lt));
+        }
+        let msg = if self.layoutalltags { "layout: all tags" } else { "layout: per tag" };
+        let argv = ["notify-send", "-t", "2000", "dwmr", msg].map(String::from).to_vec();
+        self.spawn(&Arg::V(Rc::new(Command { name: String::new(), argv })));
     }
 
     pub fn togglefloating(&mut self, _arg: &Arg) {
