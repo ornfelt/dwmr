@@ -302,6 +302,8 @@ keys = [
 	{ mod = "MODKEY",                   key = "apostrophe", func = "togglescratch", arg = { ui = 0 } },
 	# /* bind mod-shift-apostrophe: togglescratch spcalc */
 	{ mod = "MODKEY|ShiftMask",         key = "apostrophe", func = "togglescratch", arg = { ui = 1 } },
+	# /* bind mod-F12: togglescratch spcalc (like awesome's dropdown terminal) */
+	{ mod = "MODKEY",                   key = "F12",      func = "togglescratch", arg = { ui = 1 } },
 
 	# /* bind mod-shift-x: spawn i3lock */
 	{ mod = "MODKEY|ShiftMask",         key = "x",        func = "spawn",           arg = { v = "lockcmd" } },
