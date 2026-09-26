@@ -143,7 +143,6 @@ commands.ewwcmd            = ["/bin/sh", "-c", "~/.local/bin/my_scripts/loadEww.
 commands.termwdcmd         = ["/bin/sh", "-c", "~/.local/bin/my_scripts/term_wd.sh wezterm"]
 commands.sectermwdcmd      = ["/bin/sh", "-c", "~/.local/bin/my_scripts/term_wd.sh st"]
 commands.showkeysdwmcmd    = ["/bin/sh", "-c", "~/.local/bin/my_scripts/show_keys.sh dwm wezterm"]
-commands.showkeysvimcmd    = ["/bin/sh", "-c", "~/.local/bin/my_scripts/show_keys.sh vim wezterm"]
 commands.mutecmd           = ["/bin/sh", "-c", "pactl set-sink-mute @DEFAULT_SINK@ toggle ; kill -44 $(pidof dwmblocksr)"]
 commands.voldowncmd        = ["/bin/sh", "-c", "pactl set-sink-volume @DEFAULT_SINK@ -5%; kill -44 $(pidof dwmblocksr)"]
 commands.volupcmd          = ["/bin/sh", "-c", "pactl set-sink-volume @DEFAULT_SINK@ +5%; kill -44 $(pidof dwmblocksr)"]
@@ -388,8 +387,6 @@ keys = [
 
 	# /* bind F1: spawn show_keys.sh dwm */
 	{ mod = "0",                        key = "F1",       func = "spawn",           arg = { v = "showkeysdwmcmd" } },
-	# /* bind shift-F1: spawn show_keys.sh vim */
-	{ mod = "ShiftMask",                key = "F1",       func = "spawn",           arg = { v = "showkeysvimcmd" } },
 	# /* bind F10: spawn pactl toggle mute */
 	{ mod = "0",                        key = "F10",      func = "spawn",           arg = { v = "mutecmd" } },
 	# /* bind F11: spawn pactl volume -5% */
