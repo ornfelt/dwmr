@@ -109,7 +109,7 @@ commands.lockcmd           = ["/bin/sh", "-c", "i3lock"]
 commands.lockwallpapercmd  = ["/bin/sh", "-c", "i3lock -i ~/Downloads/lock-wallpaper.png"]
 commands.filexcmd          = ["/bin/sh", "-c", "wezterm -e yazi ~/"]
 commands.fileexplorerwdcmd = ["/bin/sh", "-c", "~/.local/bin/my_scripts/file_explorer_wd.sh wezterm yazi"]
-commands.powermenucmd      = ["/bin/sh", "-c", "~/.local/bin/my_scripts/alert_exit.sh && ~/.config/polybar/forest/scripts/powermenu.sh"]
+commands.powermenucmd      = ["/bin/sh", "-c", "~/.local/bin/my_scripts/sysmenu.sh"]
 commands.screenclipcmd     = ["/bin/sh", "-c", "f=$(mktemp --suffix=.png) && maim -s -u \"$f\" && xclip -selection clipboard -t image/png -i \"$f\"; rm -f \"$f\""]
 commands.ocrcmd            = ["/bin/sh", "-c", "~/.local/bin/my_scripts/tesseract_ocr.sh"]
 commands.roficmd           = ["/bin/sh", "-c", "rofi -show run -theme ~/.config/rofi/themes/gruvbox/gruvbox-dark.rasi"]
@@ -314,7 +314,7 @@ keys = [
 	{ mod = "MODKEY",                   key = "w",        func = "spawn",           arg = { v = "filexcmd" } },
 	# /* bind mod-e: spawn file_explorer_wd.sh */
 	{ mod = "MODKEY",                   key = "e",        func = "spawn",           arg = { v = "fileexplorerwdcmd" } },
-	# /* bind mod-shift-e: spawn powermenu.sh */
+	# /* bind mod-shift-e: spawn sysmenu.sh */
 	{ mod = "MODKEY|ShiftMask",         key = "e",        func = "spawn",           arg = { v = "powermenucmd" } },
 	# /* bind mod-shift-s: spawn screenshot to clipboard */
 	{ mod = "MODKEY|ShiftMask",         key = "s",        func = "spawn",           arg = { v = "screenclipcmd" } },
