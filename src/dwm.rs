@@ -1724,6 +1724,7 @@ impl Dwm {
         let selmon = self.selmon;
         self.mons[selmon].nmaster = (self.mons[selmon].nmaster + arg.i()).max(0);
         self.arrange(Some(selmon));
+        self.notifysend("nmaster", &format!("master: {}", self.mons[selmon].nmaster));
     }
 
     fn keypress(&mut self, e: &XEvent) {
@@ -2065,6 +2066,14 @@ impl Dwm {
             c = self.clients[i].next;
         }
         c
+    }
+
+    /// A notification (dunst); a new one replaces the last one with the same
+    /// tag instead of stacking.
+    fn notifysend(&mut self, tag: &str, msg: &str) {
+        let hint = format!("string:x-dunst-stack-tag:{tag}");
+        let argv = ["notify-send", "-t", "2000", "-h", &hint, "dwmr", msg].map(String::from).to_vec();
+        self.spawn(&Arg::V(Rc::new(Command { name: String::new(), argv })));
     }
 
     /// The monitor at position `num` in the monitor list, or the last one if
@@ -3326,8 +3335,7 @@ impl Dwm {
             self.setlayout(&Arg::Layout(lt));
         }
         let msg = if self.layoutalltags { "layout: all tags" } else { "layout: per tag" };
-        let argv = ["notify-send", "-t", "2000", "dwmr", msg].map(String::from).to_vec();
-        self.spawn(&Arg::V(Rc::new(Command { name: String::new(), argv })));
+        self.notifysend("layout", msg);
     }
 
     pub fn togglefloating(&mut self, _arg: &Arg) {
@@ -3420,6 +3428,7 @@ impl Dwm {
         };
         let sticky = !self.clients[sel].issticky;
         self.setsticky(sel, sticky);
+        self.notifysend("sticky", if sticky { "sticky: on" } else { "sticky: off" });
         self.arrange(Some(selmon));
     }
 
