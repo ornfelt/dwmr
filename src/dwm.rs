@@ -723,7 +723,6 @@ impl Dwm {
         self.detach(c);
         self.detachstack(c);
 
-        self.setclientstate(c, WITHDRAWN_STATE);
         // SAFETY: plain Xlib call.
         unsafe { XUnmapWindow(self.dpy, self.clients[p].win) };
 
@@ -733,6 +732,8 @@ impl Dwm {
         let w = self.clients[p].win;
         self.clients[p].win = self.clients[c].win;
         self.clients[c].win = w;
+        // after the swap c's win is the hidden terminal; the swallowed window keeps NORMAL_STATE
+        self.setclientstate(c, WITHDRAWN_STATE);
         let b = self.clients[p].isbrowser;
         self.clients[p].isbrowser = self.clients[c].isbrowser;
         self.clients[c].isbrowser = b;
