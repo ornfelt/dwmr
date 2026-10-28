@@ -105,6 +105,19 @@ fn modulo(n: i32, m: i32) -> i32 {
     n.rem_euclid(m)
 }
 
+/// ewmhtags: the `_NET_WM_DESKTOP` of a client on `tags` (its normal tags,
+/// without scratchpads): the lowest one, every desktop when it is sticky or
+/// on all tags, none when it is only on a scratchpad.
+fn clientdesktop(tags: u32, sticky: bool, tagbits: u32) -> Option<u32> {
+    if sticky || tags == tagbits {
+        Some(ALL_DESKTOPS)
+    } else if tags == 0 {
+        None
+    } else {
+        Some(tags.trailing_zeros())
+    }
+}
+
 /* enums */
 const CUR_NORMAL: usize = 0;
 const CUR_RESIZE: usize = 1;
@@ -120,12 +133,22 @@ const NET_ACTIVE_WINDOW: usize = 6;
 const NET_WM_WINDOW_TYPE: usize = 7;
 const NET_WM_WINDOW_TYPE_DIALOG: usize = 8;
 const NET_CLIENT_LIST: usize = 9;
-const NET_LAST: usize = 10; /* EWMH atoms */
+const NET_NUMBER_OF_DESKTOPS: usize = 10;
+const NET_CURRENT_DESKTOP: usize = 11;
+const NET_DESKTOP_NAMES: usize = 12;
+const NET_DESKTOP_VIEWPORT: usize = 13;
+const NET_WM_DESKTOP: usize = 14;
+const NET_LAST: usize = 15; /* EWMH atoms */
 const WM_PROTOCOLS: usize = 0;
 const WM_DELETE: usize = 1;
 const WM_STATE: usize = 2;
 const WM_TAKE_FOCUS: usize = 3;
 const WM_LAST: usize = 4; /* default atoms */
+const DWM_TAGS: usize = 0;
+const DWM_VIEWED_TAGS: usize = 1;
+const DWM_LAST: usize = 2; /* dwm's own atoms: the tag masks EWMH desktops cannot hold */
+/// `_NET_WM_DESKTOP` of a window on every desktop (EWMH)
+const ALL_DESKTOPS: u32 = 0xFFFF_FFFF;
 
 /* X request codes (X11/Xproto.h), not exported by the x11 crate */
 const X_CONFIGURE_WINDOW: c_uchar = 12;
@@ -210,6 +233,9 @@ pub struct Client {
     pub swallowing: Option<ClientId>,
     pub mon: MonId,
     pub win: Window,
+    /// The window, tags and sticky state its `_NET_WM_DESKTOP` / `_DWM_TAGS`
+    /// were last written for (updateewmhtags); swallow swaps windows between clients.
+    pub ewmhtags: Option<(Window, u32, bool)>,
 }
 
 #[derive(Default)]
@@ -321,6 +347,10 @@ pub struct Dwm {
     numlockmask: u32,
     wmatom: [Atom; WM_LAST],
     netatom: [Atom; NET_LAST],
+    dwmatom: [Atom; DWM_LAST],
+    /// The `_NET_CURRENT_DESKTOP` and `_DWM_VIEWED_TAGS` last written (updateewmhtags).
+    ewmhdesktop: Option<u32>,
+    ewmhviewed: Option<u32>,
     running: bool,
     /// setlayout sets every tag's (and monitor's) layout; togglelayoutalltags
     /// flips it (config.layoutalltags at startup).
@@ -405,6 +435,9 @@ impl Dwm {
             numlockmask: 0,
             wmatom: [0; WM_LAST],
             netatom: [0; NET_LAST],
+            dwmatom: [0; DWM_LAST],
+            ewmhdesktop: None,
+            ewmhviewed: None,
             running: true,
             cursor: Default::default(),
             scheme: Vec::new(),
@@ -681,6 +714,7 @@ impl Dwm {
                 }
             }
         }
+        self.updateewmhtags();
     }
 
     fn arrangemon(&mut self, m: MonId) {
@@ -940,6 +974,11 @@ impl Dwm {
             XSync(self.dpy, False);
             XSetInputFocus(self.dpy, PointerRoot as Window, RevertToPointerRoot, CurrentTime);
             XDeleteProperty(self.dpy, self.root, self.netatom[NET_ACTIVE_WINDOW]);
+            /* ewmhtags: a window manager started after dwm sees no stale desktops */
+            for a in [NET_NUMBER_OF_DESKTOPS, NET_CURRENT_DESKTOP, NET_DESKTOP_NAMES, NET_DESKTOP_VIEWPORT] {
+                XDeleteProperty(self.dpy, self.root, self.netatom[a]);
+            }
+            XDeleteProperty(self.dpy, self.root, self.dwmatom[DWM_VIEWED_TAGS]);
         }
     }
 
@@ -955,6 +994,17 @@ impl Dwm {
 
     fn clientmessage(&mut self, e: &XEvent) {
         let cme: XClientMessageEvent = e.into();
+        /* ewmhtags: a pager / tool asks to show a desktop (tag) */
+        if cme.window == self.root && cme.message_type == self.netatom[NET_CURRENT_DESKTOP] {
+            if let Some(i) = usize::try_from(cme.data.get_long(0)).ok().filter(|&i| i < self.config.tags.len()) {
+                let m = &self.mons[self.selmon];
+                /* view() of the tag already shown would go back to the previous tagset */
+                if self.mons.len() > 1 || 1 << i != m.tagset[m.seltags] {
+                    self.view(&Arg::Ui(1 << i));
+                }
+            }
+            return;
+        }
         let Some(c) = self.wintoclient(cme.window) else {
             return;
         };
@@ -981,6 +1031,21 @@ impl Dwm {
             && !self.clients[c].isurgent
         {
             self.seturgent(c, true);
+        } else if cme.message_type == self.netatom[NET_WM_DESKTOP] {
+            /* ewmhtags: move the window to a desktop (tag); every desktop makes it sticky */
+            let i = cme.data.get_long(0);
+            if i as u32 == ALL_DESKTOPS {
+                self.setsticky(c, true);
+            } else if let Some(i) = usize::try_from(i).ok().filter(|&i| i < self.config.tags.len()) {
+                if Some(c) == self.mons[self.selmon].sel {
+                    self.tag(&Arg::Ui(1 << i));
+                } else {
+                    /* not the selected client: no move to the tag's monitor, as tag() does */
+                    self.clients[c].tags = 1 << i;
+                    self.focus(None);
+                    self.arrange(Some(self.clients[c].mon));
+                }
+            }
         }
     }
 
@@ -1403,6 +1468,7 @@ impl Dwm {
         }
         self.mons[self.selmon].sel = c;
         self.drawbars();
+        self.updateewmhtags();
     }
 
     /* there are some broken focus acquiring clients needing extra handling */
@@ -2728,6 +2794,15 @@ impl Dwm {
     /// (its height in a column of tile, deck and centeredmaster, its width in
     /// bstack and centeredfloatingmaster) by arg.f(), within 0.25..=4.0; 0
     /// sets it back to 1.0.
+    /// Sets a one-value CARDINAL property, as ewmhtags writes them.
+    fn setcardinal(&self, w: Window, prop: Atom, value: u32) {
+        let data: c_long = value as c_long;
+        // SAFETY: data is one 32-bit-format long, as XChangeProperty expects.
+        unsafe {
+            XChangeProperty(self.dpy, w, prop, XA_CARDINAL, 32, PropModeReplace, &data as *const c_long as *const c_uchar, 1);
+        }
+    }
+
     pub fn setcfact(&mut self, arg: &Arg) {
         let selmon = self.selmon;
         let Some(c) = self.mons[selmon].sel else {
@@ -2742,6 +2817,44 @@ impl Dwm {
         }
         self.clients[c].cfact = f;
         self.arrange(Some(selmon));
+    }
+
+    /// ewmhtags: the tags as EWMH desktops, set once in setup(): their
+    /// number, their names and their viewports (all 0,0: no large desktops).
+    fn setdesktops(&mut self, utf8string: Atom) {
+        let tags = &self.config.tags;
+        let mut names: Vec<u8> = Vec::new();
+        for t in tags.iter() {
+            names.extend_from_slice(t.as_bytes());
+            names.push(0);
+        }
+        let viewport: Vec<c_long> = vec![0; 2 * tags.len()];
+        let n = tags.len() as u32;
+        self.setcardinal(self.root, self.netatom[NET_NUMBER_OF_DESKTOPS], n);
+        // SAFETY: names is NUL-separated UTF-8 (format 8), viewport holds
+        // 2 * n 32-bit-format longs.
+        unsafe {
+            XChangeProperty(
+                self.dpy,
+                self.root,
+                self.netatom[NET_DESKTOP_NAMES],
+                utf8string,
+                8,
+                PropModeReplace,
+                names.as_ptr(),
+                names.len() as c_int,
+            );
+            XChangeProperty(
+                self.dpy,
+                self.root,
+                self.netatom[NET_DESKTOP_VIEWPORT],
+                XA_CARDINAL,
+                32,
+                PropModeReplace,
+                viewport.as_ptr() as *const c_uchar,
+                viewport.len() as c_int,
+            );
+        }
     }
 
     pub fn setlayout(&mut self, arg: &Arg) {
@@ -2858,6 +2971,13 @@ impl Dwm {
         self.netatom[NET_WM_WINDOW_TYPE] = atom(c"_NET_WM_WINDOW_TYPE");
         self.netatom[NET_WM_WINDOW_TYPE_DIALOG] = atom(c"_NET_WM_WINDOW_TYPE_DIALOG");
         self.netatom[NET_CLIENT_LIST] = atom(c"_NET_CLIENT_LIST");
+        self.netatom[NET_NUMBER_OF_DESKTOPS] = atom(c"_NET_NUMBER_OF_DESKTOPS");
+        self.netatom[NET_CURRENT_DESKTOP] = atom(c"_NET_CURRENT_DESKTOP");
+        self.netatom[NET_DESKTOP_NAMES] = atom(c"_NET_DESKTOP_NAMES");
+        self.netatom[NET_DESKTOP_VIEWPORT] = atom(c"_NET_DESKTOP_VIEWPORT");
+        self.netatom[NET_WM_DESKTOP] = atom(c"_NET_WM_DESKTOP");
+        self.dwmatom[DWM_TAGS] = atom(c"_DWM_TAGS");
+        self.dwmatom[DWM_VIEWED_TAGS] = atom(c"_DWM_VIEWED_TAGS");
         /* init cursors */
         self.cursor[CUR_NORMAL] = self.drw.cur_create(XC_LEFT_PTR);
         self.cursor[CUR_RESIZE] = self.drw.cur_create(XC_SIZING);
@@ -2932,6 +3052,10 @@ impl Dwm {
                 NET_LAST as c_int,
             );
             XDeleteProperty(self.dpy, self.root, self.netatom[NET_CLIENT_LIST]);
+        }
+        self.setdesktops(utf8string);
+        // SAFETY: plain Xlib calls on the root window.
+        unsafe {
             /* select events */
             let mut wa: XSetWindowAttributes = mem::zeroed();
             wa.cursor = self.cursor[CUR_NORMAL].cursor;
@@ -3559,6 +3683,9 @@ impl Dwm {
                 XConfigureWindow(self.dpy, win, CWBorderWidth as c_uint, &mut wc); /* restore border */
                 XUngrabButton(self.dpy, AnyButton as c_uint, AnyModifier, win);
                 self.setclientstate(c, WITHDRAWN_STATE);
+                /* ewmhtags: a withdrawn window is on no desktop */
+                XDeleteProperty(self.dpy, win, self.netatom[NET_WM_DESKTOP]);
+                XDeleteProperty(self.dpy, win, self.dwmatom[DWM_TAGS]);
                 XSync(self.dpy, False);
                 XSetErrorHandler(Some(xerror));
                 XUngrabServer(self.dpy);
@@ -3653,6 +3780,50 @@ impl Dwm {
                     );
                     c = self.clients[i].next;
                 }
+            }
+        }
+    }
+
+    /// ewmhtags: mirrors the tags into the EWMH desktop properties, after
+    /// every arrange() and focus(): the root's `_NET_CURRENT_DESKTOP` (the
+    /// lowest tag selmon views) and `_DWM_VIEWED_TAGS` (the tags any monitor
+    /// views), each client's `_NET_WM_DESKTOP` (see clientdesktop()) and
+    /// `_DWM_TAGS` (its tag mask, which EWMH cannot hold: a dwm window can be
+    /// on several tags). Only what changed is written.
+    fn updateewmhtags(&mut self) {
+        let tagbits = self.tagbits();
+        let Some(sel) = self.mons.get(self.selmon) else {
+            return;
+        };
+        let cur = sel.tagset[sel.seltags] & tagbits;
+        if cur != 0 && self.ewmhdesktop != Some(cur.trailing_zeros()) {
+            self.ewmhdesktop = Some(cur.trailing_zeros());
+            self.setcardinal(self.root, self.netatom[NET_CURRENT_DESKTOP], cur.trailing_zeros());
+        }
+        let viewed = self.mons.iter().fold(0, |v, m| v | (m.tagset[m.seltags] & tagbits));
+        if self.ewmhviewed != Some(viewed) {
+            self.ewmhviewed = Some(viewed);
+            self.setcardinal(self.root, self.dwmatom[DWM_VIEWED_TAGS], viewed);
+        }
+        for m in 0..self.mons.len() {
+            let mut c = self.mons[m].clients;
+            while let Some(i) = c {
+                let cl = &self.clients[i];
+                let key = (cl.win, cl.tags & tagbits, cl.issticky);
+                c = cl.next;
+                if cl.ewmhtags == Some(key) {
+                    continue;
+                }
+                let (win, tags, sticky) = key;
+                match clientdesktop(tags, sticky, tagbits) {
+                    Some(d) => self.setcardinal(win, self.netatom[NET_WM_DESKTOP], d),
+                    // SAFETY: plain Xlib call on a managed window.
+                    None => unsafe {
+                        XDeleteProperty(self.dpy, win, self.netatom[NET_WM_DESKTOP]);
+                    },
+                }
+                self.setcardinal(win, self.dwmatom[DWM_TAGS], tags);
+                self.clients[i].ewmhtags = Some(key);
             }
         }
     }
@@ -4201,4 +4372,19 @@ unsafe extern "C" fn xerrordummy(_dpy: *mut Display, _ee: *mut XErrorEvent) -> c
  * is already running. */
 unsafe extern "C" fn xerrorstart(_dpy: *mut Display, _ee: *mut XErrorEvent) -> c_int {
     die("dwmr: another window manager is already running");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clientdesktop_maps_tags_to_desktops() {
+        let tagbits = (1u32 << 9) - 1;
+        assert_eq!(clientdesktop(1 << 2, false, tagbits), Some(2)); /* tag 3 */
+        assert_eq!(clientdesktop(1 << 2 | 1 << 5, false, tagbits), Some(2)); /* the lowest of two */
+        assert_eq!(clientdesktop(tagbits, false, tagbits), Some(ALL_DESKTOPS)); /* every tag */
+        assert_eq!(clientdesktop(1, true, tagbits), Some(ALL_DESKTOPS)); /* sticky */
+        assert_eq!(clientdesktop(0, false, tagbits), None); /* a scratchpad's only */
+    }
 }

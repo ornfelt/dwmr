@@ -177,6 +177,18 @@ A few notes on the format:
 - Focus follows mouse clicks only, not pointer movement (dwm's focusonclick
   patch). `focusonwheel = false` (the default) lets the scroll wheel work on
   an unfocused window without focusing it.
+- The tags are EWMH desktops (like dwm's ewmhtags patch), so pagers, status
+  bars and tools such as `xdotool` and `wmctrl` see them. The root window holds
+  `_NET_NUMBER_OF_DESKTOPS`, `_NET_DESKTOP_NAMES`, `_NET_DESKTOP_VIEWPORT` and
+  `_NET_CURRENT_DESKTOP` (the lowest tag the selected monitor shows). Every
+  window holds `_NET_WM_DESKTOP`: its lowest tag, `0xFFFFFFFF` when it is sticky
+  or on every tag, none when only a scratchpad's. A `_NET_CURRENT_DESKTOP`
+  request (`xdotool set_desktop 2`) shows that tag, a `_NET_WM_DESKTOP` request
+  (`xdotool set_desktop_for_window <win> 2`) moves the window there. EWMH has
+  one desktop per window and one current desktop, so dwmr also sets
+  `_DWM_TAGS` on every window (its tag mask, bit 0 = tag 1) and
+  `_DWM_VIEWED_TAGS` on the root (the tags any monitor shows):
+  `xprop -root _DWM_VIEWED_TAGS`, `xprop _DWM_TAGS` and a click.
 - A sticky window is visible on every tag of its monitor (dwm's sticky
   patch). `_NET_WM_STATE_STICKY` is supported, so a client can set the state
   itself, and `_NET_WM_STATE` lists both the fullscreen and the sticky state.
