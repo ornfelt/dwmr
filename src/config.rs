@@ -1172,7 +1172,7 @@ mod tests {
         let c = parse(DEFAULT_TOML).expect("config/config.toml parses");
         assert_eq!((c.borderpx, c.snap), (2, 32));
         assert!(c.showbar && c.topbar);
-        assert_eq!(c.fonts, ["JetBrainsMono Nerd Font:size=11:style=bold"]);
+        assert_eq!(c.fonts, ["JetBrainsMono Nerd Font Propo:size=11:style=bold"]);
         assert_eq!(c.colors[SCHEME_NORM], ["#ebdbb2", "#282828", "#282828"]);
         assert_eq!(c.colors[SCHEME_SEL], ["#ebdbb2", "#282828", "#ebdbb2"]);
         assert!(!c.resizehints);
