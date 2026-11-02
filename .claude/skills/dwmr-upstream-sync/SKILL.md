@@ -7,7 +7,7 @@ argument-hint: "[empty means every remaining commit within the run budget, or: s
 
 # Sync dwm commits into dwmr
 
-dwmr (`~/Code2/Rust/dwmr`, branch `master`, remote `origin` = `https://github.com/ornfelt/dwmr`)
+dwmr (`~/Code2/Rust/dwmr`, branch `main`, remote `origin` = `https://github.com/ornfelt/dwmr`)
 is a Rust port of the user's patched dwm. The **source** of this sync is that dwm:
 
 | | |
@@ -165,7 +165,7 @@ Rules for the ledger:
 - The `Notes` column is where the real information lives: which dwmr functions changed, what was
   reshaped or dropped and why, what went into the shipped and the user's config, and `flagged`
   when the row has an entry under "Flagged for dwm".
-- If the ledger disagrees with dwmr's `master`, **the tree wins** and the rows concerned are
+- If the ledger disagrees with dwmr's `main`, **the tree wins** and the rows concerned are
   rebuilt per "Picking up the current state" in the same run.
 
 ### upstream_info.txt
@@ -182,11 +182,11 @@ It changes whenever the high-water mark moves, and is committed with the ledger.
 
 ### Picking up the current state
 
-The ledger can be rebuilt from dwmr's `master` and dwm's `master` - on setup, in `rebuild` mode,
+The ledger can be rebuilt from dwmr's `main` and dwm's `master` - on setup, in `rebuild` mode,
 and whenever the ledger is missing rows, has a row for a commit not in `$BASE..master`, or
 disagrees with the code. For each dwm commit after the baseline, in ledger order:
 
-1. **An earlier sync**: `git log --format='%h %s' --grep="^dwm-commit: <full sha>" master` finds
+1. **An earlier sync**: `git log --format='%h %s' --grep="^dwm-commit: <full sha>" main` finds
    the dwmr commit that carries it. Fall back to the subject (with the program-name swaps of
    section 5) for a commit made by hand without the trailer. Found: `ported`, or `adapted` /
    `partial` with `needed` when the dwmr commit clearly reshaped or left out part of it, naming
@@ -365,7 +365,7 @@ nothing but housekeeping skips makes one ledger commit at the end. No attributio
 
 ### Replay
 
-`replay <dwm-commit>` never rewrites a commit already in `master` (it may be pushed). For a ported
+`replay <dwm-commit>` never rewrites a commit already in `main` (it may be pushed). For a ported
 commit, the correction - the rest of a `partial` port, a wrong translation, a fix the user wants
 after a flag - is a new dwmr commit on top, named for what it does and the dwm commit it follows
 up (e.g. `focusstack: <what was fixed> (follow-up to dwm <short sha>)`), with the same
