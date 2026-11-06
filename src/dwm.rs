@@ -355,6 +355,9 @@ pub struct Dwm {
     /// setlayout sets every tag's (and monitor's) layout; togglelayoutalltags
     /// flips it (config.layoutalltags at startup).
     layoutalltags: bool,
+    /// The bar shows the focused window's title; toggletitle flips it
+    /// (config.showtitle at startup).
+    showtitle: bool,
     /// The index in layouts of each tag's layout, used when !layoutalltags.
     taglayouts: Vec<usize>,
     cursor: [Cur; CUR_LAST],
@@ -416,6 +419,7 @@ impl Dwm {
             layouts: config.layouts.clone(),
             browsergaps: config.browsergaps,
             layoutalltags: config.layoutalltags,
+            showtitle: config.showtitle,
             taglayouts: vec![0; config.tags.len()],
             config: Rc::new(config),
             stext: String::new(),
@@ -888,7 +892,7 @@ impl Dwm {
                 self.stext = stext;
                 self.setnormalfont();
             }
-            /* notitle: the space between the layout symbol and the status is
+            /* the space between the layout symbol and the status (the title) is
              * no click target; click stays ClkRootWin */
         } else if let Some(c) = self.wintoclient(ev.window) {
             if config.focusonwheel || (ev.button != Button4 && ev.button != Button5) {
@@ -1299,9 +1303,13 @@ impl Dwm {
 
         let w = self.mons[m].ww - tw - x;
         if w > bh {
-            /* notitle: no window title, just clear the rest of the bar */
             self.drw.setscheme(&self.scheme[SCHEME_NORM]);
-            self.drw.rect(x, 0, w as u32, bh as u32, true, true);
+            match self.mons[m].sel {
+                Some(sel) if self.showtitle => {
+                    self.drw.text(x, 0, w as u32, bh as u32, (lrpad / 2) as u32, &self.clients[sel].name, false);
+                }
+                _ => self.drw.rect(x, 0, w as u32, bh as u32, true, true),
+            }
         }
         self.drw.map(self.mons[m].barwin, 0, 0, self.mons[m].ww as u32, bh as u32);
     }
@@ -2192,7 +2200,11 @@ impl Dwm {
                 _ => {}
             }
             if ev.atom == XA_WM_NAME || ev.atom == self.netatom[NET_WM_NAME] {
-                self.updatetitle(c); /* notitle: the bar does not show it */
+                self.updatetitle(c);
+                let m = self.clients[c].mon;
+                if self.showtitle && self.mons[m].sel == Some(c) {
+                    self.drawbar(m);
+                }
             }
             if ev.atom == self.netatom[NET_WM_WINDOW_TYPE] {
                 self.updatewindowtype(c);
@@ -3617,6 +3629,11 @@ impl Dwm {
             self.focus(None);
             self.arrange(Some(selmon));
         }
+    }
+
+    pub fn toggletitle(&mut self, _arg: &Arg) {
+        self.showtitle = !self.showtitle;
+        self.drawbars();
     }
 
     pub fn toggleview(&mut self, arg: &Arg) {

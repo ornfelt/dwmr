@@ -158,6 +158,7 @@ pub struct Config {
     pub snap: u32,     /* snap pixel */
     pub swallowfloating: bool, /* true means swallow floating windows by default */
     pub showbar: bool, /* false means no bar */
+    pub showtitle: bool, /* false means no window title in the bar */
     pub topbar: bool,  /* false means bottom bar */
     pub focusonwheel: bool, /* false allows the user to scroll window without changing focus */
     pub fonts: Vec<String>,
@@ -333,6 +334,7 @@ impl Default for Config {
             k(modkey | xlib::ShiftMask, XK_Right, Dwm::tagmon, Arg::I(1)),
             k(modkey | xlib::ShiftMask, XK_p, Dwm::togglebars, Arg::None),
             k(modkey | xlib::ControlMask | xlib::ShiftMask, XK_p, Dwm::togglebar, Arg::None),
+            k(modkey | xlib::ControlMask, XK_w, Dwm::toggletitle, Arg::None),
             k(modkey, XK_apostrophe, Dwm::togglescratch, Arg::Ui(0)),
             k(modkey | xlib::ShiftMask, XK_apostrophe, Dwm::togglescratch, Arg::Ui(1)),
         ];
@@ -376,6 +378,7 @@ impl Default for Config {
             snap: 32,
             swallowfloating: false,
             showbar: true,
+            showtitle: true,
             topbar: true,
             focusonwheel: false,
             fonts: vec!["monospace:size=10".into()],
@@ -480,6 +483,7 @@ struct RawConfig {
     snap: Option<u32>,
     swallowfloating: Option<bool>,
     showbar: Option<bool>,
+    showtitle: Option<bool>,
     topbar: Option<bool>,
     focusonwheel: Option<bool>,
     fonts: Option<Vec<String>>,
@@ -783,6 +787,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "togglegaps" => Dwm::togglegaps,
         "togglescratch" => Dwm::togglescratch,
         "togglesticky" => Dwm::togglesticky,
+        "toggletitle" => Dwm::toggletitle,
         "toggletag" => Dwm::toggletag,
         "toggleview" => Dwm::toggleview,
         "view" => Dwm::view,
@@ -897,6 +902,9 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
     }
     if let Some(v) = raw.showbar {
         config.showbar = v;
+    }
+    if let Some(v) = raw.showtitle {
+        config.showtitle = v;
     }
     if let Some(v) = raw.topbar {
         config.topbar = v;
@@ -1188,7 +1196,7 @@ mod tests {
         };
         assert!(cmd.argv[2].ends_with("kill -44 $(pidof dwmblocksr)"));
         /* every mapping from config.h: STACKKEYS, TAGKEYS (4 keys each) and the rest */
-        assert_eq!(c.keys.len(), 8 + 9 * 4 + 106);
+        assert_eq!(c.keys.len(), 8 + 9 * 4 + 107);
         assert_eq!(c.buttons.len(), 22);
     }
 

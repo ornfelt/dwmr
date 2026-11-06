@@ -85,7 +85,7 @@ A few notes on the format:
   tagview, focusmon, focusnthmon, tagmon, tagmonview, tagnthmonview,
   togglebars, toggleview, toggletag, shifttag, shiftview, shiftviewclients,
   defaultgaps, incrgaps, togglegaps, togglebgaps, sigstatusbar, quit,
-  movemouse, resizemouse.
+  toggletitle, movemouse, resizemouse.
   Layouts: spiral, tile, bstack, dwindle, deck, monocle, centeredmaster,
   centeredfloatingmaster, none.
 - `tagmonview` sends the focused window to the previous/next monitor like
@@ -167,8 +167,10 @@ A few notes on the format:
   Mod1-Button2 togglefloating. The default layout is spiral; Mod1-t/f/m still
   select tile, floating and monocle.
 - Setting only `modkey` rebinds the default keys and buttons to it.
-- The bar shows no window title and has no title click area (dwm's notitle
-  patch); `ClkWinTitle` is not a valid click.
+- The bar shows the title of the focused window after the layout symbol.
+  `showtitle = false` leaves it out and `toggletitle` (Mod-Control-w) switches
+  it at runtime. The title has no click area (dwm's notitle patch);
+  `ClkWinTitle` is not a valid click.
 - Only selected or occupied tags are drawn, without the small occupancy
   squares (dwm's hide_vacant_tags patch). A window on every tag does not
   count as occupying them. Clicks on the tag bar follow the same layout.
