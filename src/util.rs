@@ -30,6 +30,82 @@ pub fn truncate_utf8(s: &mut String, max_bytes: usize) {
     }
 }
 
+/// Shorten a title of more than `head + tail + 18` characters to its start,
+/// " … " and its end (shorttitle). The start is cut at the space closest to
+/// `head` characters, within `head - 5 ..= head + 10`; the end starts at an
+/// app name separator (" - ", " – ", " — ", " | ") between `tail - 5` and
+/// `tail + 5` characters from the end, else at the space there closest to
+/// `tail`. With no space in range a part is cut at exactly `head` / `tail`
+/// characters. Writes the shortened title to `dst` and returns true, or
+/// returns false when `src` is short enough to be shown as it is (or
+/// `head` / `tail` is not 1..=255).
+pub fn shortentitle(dst: &mut String, src: &str, head: u32, tail: u32) -> bool {
+    if !(1..=255).contains(&head) || !(1..=255).contains(&tail) {
+        return false;
+    }
+    let (head, tail) = (head as usize, tail as usize);
+    /* the byte offset of each character, so lengths count characters */
+    let mut off = [0usize; 257];
+    let mut n = 0;
+    for (i, _) in src.char_indices() {
+        if n == off.len() - 1 {
+            return false;
+        }
+        off[n] = i;
+        n += 1;
+    }
+    off[n] = src.len();
+    let (hmin, hmax) = (head.saturating_sub(5).max(1), head + 10);
+    let (tmin, tmax) = (tail.saturating_sub(5).max(1), tail + 5);
+    if n <= hmax + 3 + tmax {
+        return false;
+    }
+    let b = src.as_bytes();
+    let blank = |i: usize| matches!(b[off[i]], b' ' | b'\t');
+    let separator = |i: usize| src[off[i]..].starts_with(['-', '|', '–', '—']);
+
+    /* the start, up to the space closest to head */
+    let mut best: usize = 0;
+    for i in hmin..=hmax {
+        if blank(i) && (best == 0 || i.abs_diff(head) < best.abs_diff(head)) {
+            best = i;
+        }
+    }
+    let mut h = if best != 0 { best } else { head };
+    while h > 0 && blank(h - 1) {
+        h -= 1;
+    }
+
+    /* the end, from the separator, else the space, closest to tail */
+    best = 0;
+    for i in n - tmax..=n - tmin {
+        if blank(i - 1)
+            && i + 1 < n
+            && blank(i + 1)
+            && separator(i)
+            && (best == 0 || (n - i).abs_diff(tail) < (n - best).abs_diff(tail))
+        {
+            best = i;
+        }
+    }
+    if best == 0 {
+        for i in n - tmax..=n - tmin {
+            if blank(i - 1) && (best == 0 || (n - i).abs_diff(tail) < (n - best).abs_diff(tail)) {
+                best = i;
+            }
+        }
+    }
+    let mut t = if best != 0 { best } else { n - tail };
+    while t < n && blank(t) {
+        t += 1;
+    }
+    dst.clear();
+    dst.push_str(&src[..off[h]]);
+    dst.push_str(" … ");
+    dst.push_str(&src[off[t]..]);
+    true
+}
+
 /// `atoi()`: the leading integer of `s` after optional whitespace and sign,
 /// 0 if there is none; saturating where C's is undefined.
 pub fn atoi(s: &str) -> i32 {
@@ -138,6 +214,24 @@ mod tests {
         let mut t = String::from("abc");
         truncate_utf8(&mut t, 10);
         assert_eq!(t, "abc");
+    }
+
+    #[test]
+    fn shortentitle_cuts_at_words() {
+        let mut buf = String::new();
+        assert!(shortentitle(&mut buf, "diegoMalagrida/pocket-dots: My Arch Linux dotfiles, ready to install on a fresh system. - Mozilla Firefox", 60, 20));
+        assert_eq!(buf, "diegoMalagrida/pocket-dots: My Arch Linux dotfiles, ready to … - Mozilla Firefox");
+        /* the separator wins over the space closer to tail ("baz — Mozilla Firefox") */
+        assert!(shortentitle(&mut buf, "Some very long page title that keeps going and going for a good while, foo bar baz — Mozilla Firefox", 60, 20));
+        assert_eq!(buf, "Some very long page title that keeps going and going for a … — Mozilla Firefox");
+        /* up to head + tail + 18 characters are shown as they are */
+        assert!(!shortentitle(&mut buf, &format!("{} {}", "a".repeat(50), "b".repeat(47)), 60, 20));
+        assert!(shortentitle(&mut buf, &format!("{} {}", "a".repeat(50), "b".repeat(48)), 60, 20));
+        /* no space in range: exactly head / tail characters, not bytes */
+        assert!(shortentitle(&mut buf, &"é".repeat(120), 60, 20));
+        assert_eq!(buf, format!("{} … {}", "é".repeat(60), "é".repeat(20)));
+        assert!(!shortentitle(&mut buf, "diegoMalagrida/pocket-dots: My Arch Linux dotfiles, ready to install on a fresh system. - Mozilla Firefox", 0, 20));
+        assert!(!shortentitle(&mut buf, "diegoMalagrida/pocket-dots: My Arch Linux dotfiles, ready to install on a fresh system. - Mozilla Firefox", 60, 256));
     }
 
     #[test]

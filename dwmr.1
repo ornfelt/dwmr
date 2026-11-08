@@ -33,7 +33,9 @@ tags. Selecting certain tags displays all windows with these tags.
 Each screen contains a small status bar which displays the tags in use, the
 layout, and the text read from the root window name property (on every
 screen, not only the focused one). The title of the focused window follows
-the layout, unless it is toggled off (showtitle). Only tags that are selected or
+the layout, unless it is toggled off (showtitle). A title longer than
+titlehead + titletail + 18 characters is shortened to its start, an ellipsis
+and its end, each cut at a space (shorttitle). Only tags that are selected or
 have a window are shown; vacant tags take no space (hide_vacant_tags). A
 window tagged on every tag does not make a tag count as occupied. The
 selected tags are indicated with a different color; there are no occupancy
@@ -226,6 +228,9 @@ Toggles the bars of all screens on and off together.
 .TP
 .B Mod1\-Control\-w
 Toggles the title of the focused window in the bar on and off (showtitle).
+.TP
+.B Mod1\-Control\-Shift\-w
+Toggles shortening long window titles in the bar on and off (shorttitle).
 .TP
 .B Mod1\-t
 Sets tiled layout.

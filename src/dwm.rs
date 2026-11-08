@@ -50,7 +50,7 @@ use crate::config::{
     SCHEME_NORM, SCHEME_SEL,
 };
 use crate::drw::{Clr, Cur, Drw, Fnt, CLR_NONE, COL_BG, COL_BORDER, COL_FG};
-use crate::util::{atoi, die, strtof, strtoul, truncate_utf8};
+use crate::util::{atoi, die, shortentitle, strtof, strtoul, truncate_utf8};
 use crate::xres::{XResClientIdSpec, XResClientIdValue, XResClientIdsDestroy, XResGetClientPid, XResQueryClientIds, XResQueryExtension, XRES_CLIENT_ID_PID_MASK};
 use crate::VERSION;
 
@@ -358,6 +358,11 @@ pub struct Dwm {
     /// The bar shows the focused window's title; toggletitle flips it
     /// (config.showtitle at startup).
     showtitle: bool,
+    /// Long titles are shortened in the bar (shortentitle); toggleshorttitle
+    /// flips it (config.shorttitle at startup).
+    shorttitle: bool,
+    /// The bar's shortened title, reused so drawbar does not allocate.
+    titlebuf: String,
     /// The index in layouts of each tag's layout, used when !layoutalltags.
     taglayouts: Vec<usize>,
     cursor: [Cur; CUR_LAST],
@@ -420,6 +425,8 @@ impl Dwm {
             browsergaps: config.browsergaps,
             layoutalltags: config.layoutalltags,
             showtitle: config.showtitle,
+            shorttitle: config.shorttitle,
+            titlebuf: String::new(),
             taglayouts: vec![0; config.tags.len()],
             config: Rc::new(config),
             stext: String::new(),
@@ -1306,7 +1313,15 @@ impl Dwm {
             self.drw.setscheme(&self.scheme[SCHEME_NORM]);
             match self.mons[m].sel {
                 Some(sel) if self.showtitle => {
-                    self.drw.text(x, 0, w as u32, bh as u32, (lrpad / 2) as u32, &self.clients[sel].name, false);
+                    let name = &self.clients[sel].name;
+                    let title = if self.shorttitle
+                        && shortentitle(&mut self.titlebuf, name, config.titlehead, config.titletail)
+                    {
+                        self.titlebuf.as_str()
+                    } else {
+                        name.as_str()
+                    };
+                    self.drw.text(x, 0, w as u32, bh as u32, (lrpad / 2) as u32, title, false);
                 }
                 _ => self.drw.rect(x, 0, w as u32, bh as u32, true, true),
             }
@@ -3629,6 +3644,11 @@ impl Dwm {
             self.focus(None);
             self.arrange(Some(selmon));
         }
+    }
+
+    pub fn toggleshorttitle(&mut self, _arg: &Arg) {
+        self.shorttitle = !self.shorttitle;
+        self.drawbars();
     }
 
     pub fn toggletitle(&mut self, _arg: &Arg) {

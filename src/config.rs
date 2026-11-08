@@ -159,6 +159,9 @@ pub struct Config {
     pub swallowfloating: bool, /* true means swallow floating windows by default */
     pub showbar: bool, /* false means no bar */
     pub showtitle: bool, /* false means no window title in the bar */
+    pub shorttitle: bool, /* true means shorten titles longer than titlehead + titletail + 18 characters */
+    pub titlehead: u32, /* a shortened title's start, in characters (cut at a space within -5..+10) */
+    pub titletail: u32, /* its end, in characters (cut at a space within -5..+5) */
     pub topbar: bool,  /* false means bottom bar */
     pub focusonwheel: bool, /* false allows the user to scroll window without changing focus */
     pub fonts: Vec<String>,
@@ -335,6 +338,7 @@ impl Default for Config {
             k(modkey | xlib::ShiftMask, XK_p, Dwm::togglebars, Arg::None),
             k(modkey | xlib::ControlMask | xlib::ShiftMask, XK_p, Dwm::togglebar, Arg::None),
             k(modkey | xlib::ControlMask, XK_w, Dwm::toggletitle, Arg::None),
+            k(modkey | xlib::ControlMask | xlib::ShiftMask, XK_w, Dwm::toggleshorttitle, Arg::None),
             k(modkey, XK_apostrophe, Dwm::togglescratch, Arg::Ui(0)),
             k(modkey | xlib::ShiftMask, XK_apostrophe, Dwm::togglescratch, Arg::Ui(1)),
         ];
@@ -379,6 +383,9 @@ impl Default for Config {
             swallowfloating: false,
             showbar: true,
             showtitle: true,
+            shorttitle: true,
+            titlehead: 60,
+            titletail: 20,
             topbar: true,
             focusonwheel: false,
             fonts: vec!["monospace:size=10".into()],
@@ -484,6 +491,9 @@ struct RawConfig {
     swallowfloating: Option<bool>,
     showbar: Option<bool>,
     showtitle: Option<bool>,
+    shorttitle: Option<bool>,
+    titlehead: Option<u32>,
+    titletail: Option<u32>,
     topbar: Option<bool>,
     focusonwheel: Option<bool>,
     fonts: Option<Vec<String>>,
@@ -787,6 +797,7 @@ fn parse_func(name: &str) -> Result<KeyFn, ConfigError> {
         "togglegaps" => Dwm::togglegaps,
         "togglescratch" => Dwm::togglescratch,
         "togglesticky" => Dwm::togglesticky,
+        "toggleshorttitle" => Dwm::toggleshorttitle,
         "toggletitle" => Dwm::toggletitle,
         "toggletag" => Dwm::toggletag,
         "toggleview" => Dwm::toggleview,
@@ -905,6 +916,21 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
     }
     if let Some(v) = raw.showtitle {
         config.showtitle = v;
+    }
+    if let Some(v) = raw.shorttitle {
+        config.shorttitle = v;
+    }
+    if let Some(v) = raw.titlehead {
+        if !(1..=255).contains(&v) {
+            return err("titlehead must be between 1 and 255");
+        }
+        config.titlehead = v;
+    }
+    if let Some(v) = raw.titletail {
+        if !(1..=255).contains(&v) {
+            return err("titletail must be between 1 and 255");
+        }
+        config.titletail = v;
     }
     if let Some(v) = raw.topbar {
         config.topbar = v;
@@ -1196,13 +1222,15 @@ mod tests {
         };
         assert!(cmd.argv[2].ends_with("kill -44 $(pidof dwmblocksr)"));
         /* every mapping from config.h: STACKKEYS, TAGKEYS (4 keys each) and the rest */
-        assert_eq!(c.keys.len(), 8 + 9 * 4 + 107);
+        assert_eq!(c.keys.len(), 8 + 9 * 4 + 108);
         assert_eq!(c.buttons.len(), 22);
     }
 
     #[test]
     fn rejects_bad_values() {
         assert!(parse("refreshrate = 0").is_err());
+        assert!(parse("titlehead = 0").is_err());
+        assert!(parse("titletail = 256").is_err());
         assert!(parse("layouts = []").is_err());
         assert!(parse("tags = []").is_err());
         assert!(parse("gappih = 1001").is_err());
